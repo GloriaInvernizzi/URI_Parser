@@ -23,7 +23,7 @@ urilib_parse(URIString, URI) :-
 %   urilib_display(URI, Stream)
 %
 %   Metodi per stampare l'URI passato in input sullo stream di
-%   destinazione. Nel caso di urilib_display/1 l'URI verrà stampato
+%   destinazione. Nel caso di urilib_display/1 l'URI verrï¿½ stampato
 %   sullo stream corrente.
 
 urilib_display(URI) :-
@@ -48,7 +48,7 @@ urilib_display(URI, Stream) :-
 %   mancanti da quello che si trova dopo lo Schema, passato come
 %   AfterSchema.
 
-%   Uno Schema seguito dal nulla è un URI valido.
+%   Uno Schema seguito dal nulla ï¿½ un URI valido.
 parse_uri_with_schema(Schema, [], URI) :-
     !,
     URI = uri(Schema, [], [], 80, [], [], []).
@@ -318,7 +318,7 @@ userinfo([C | Codes], Userinfo, After) :-
 %   plain_userinfo(Codes, Userinfo, After)
 %
 %   Lo Userinfo viene estratto dai codici passati in input. In questo caso
-%   lo Userinfo può essere l'unico componente presente all'interno di un
+%   lo Userinfo puï¿½ essere l'unico componente presente all'interno di un
 %   URI.
 
 plain_userinfo([], Userinfo, After) :-
@@ -338,27 +338,51 @@ plain_userinfo([C | Codes], Userinfo, After) :-
 %   host(Codes, Host, After)
 %
 %   L'Host viene estratto dai codici passati in input.
+%   Fondamentale che il primo carattere sia una lettera
 
 host([], Host, After) :-
     Host = [],
     After = [].
-host([C | Codes], Host, After) :-
+host([First | Codes], Host, After) :-
+    is_letter(First),
+    !,
+    identificatore_host(Codes, P, After),
+    Host = [First | P].
+
+
+%   identificatore_host(Codes, Host, After)
+%
+%   Verifica che la restante parte del Codes (tolto il primo carattere)
+%   ï¿½ una stringa valida
+identificatore_host([], Host, After) :-
+    Host = [],
+    After = [].
+identificatore_host([C | Codes], Host, After) :-
     (C = 58;  % Codice ASCII per :
      C = 47), % Codice ASCII per /
     !,
     Host = [],
     After = [C | Codes].
-host([C | Codes], Host, After) :-
-    identificatore_host(C,Codes),
+identificatore_host([C | Codes], Host, After) :-
+    identificatore(C),
     !,
-    host(Codes, P, After),
+    identificatore_host(Codes, P, After),
     Host = [C | P].
+
+%   is_letter(Carattere)
+%
+%   Viene stabilito se il carattere passata in input sia una lettera
+%   maiuscola o minuscola tramite il suo codice ASCII
+
+is_letter(C) :-
+    ( C >= 65, C =< 90);  % Maiuscole (A-Z)
+    ( C >= 97, C =< 122). % Minuscole (a-z)
 
 %   ip(Codes, Host, After)
 %
 %   L'Host viene estratto dai codici passati in input, se il formato dell'Host
 %   corrisponde a quello di un indirizzo IP.
-%   46 è il codice ASCII per .
+%   46 ï¿½ il codice ASCII per .
 
 ip(Codes, Host, After):-
     octet(Codes, FirstOctet, [46 | AfterFirstOctet]),
@@ -618,23 +642,6 @@ identificatore(C) :-
     C = 59;  % ;
     C = 61.  % =
 
-%   identificatore-host([Carattere|Codes])
-%
-%   Viene stabilito se la stringa passata in input sia valida per
-%   riconoscere un identificatore host, cioè una serie di caratteri che
-%   inizia con una lettera
-
-identificatore_host(C, [Code|_]) :-
-    is_letter(C),
-    caratteri(Code).
-
-%   is_letter(Carattere)
-%
-%   Viene stabilito se il carattere passata in input sia una lettera
-%   maiuscola o minuscola tramite il suo codice ASCII
-
-is_letter(C) :- C >= 65, C =< 90.  % Maiuscole (A-Z)
-is_letter(C) :- C >= 97, C =< 122. % Minuscole (a-z)
 
 
 %%%% urilib-parse.pl ends here
