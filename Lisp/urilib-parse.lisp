@@ -12,6 +12,7 @@
 
 ;;; Ognuna di queste funzioni rappresenta l'estrazione di un singolo
 ;;; componente dall'URISTRUCT.
+
 (defun urilib-scheme (uri) (uri-struct-schema uri))
 (defun urilib-userinfo (uri) (uri-struct-userinfo uri))
 (defun urilib-host (uri) (uri-struct-host uri))
@@ -25,7 +26,8 @@
 
 ;;; Metodo di debug per stampare l'URI passato in input sullo stream
 ;;; di destinazione. Nel caso in cui stream non fosse passato alla
-;;; funzione, l'output verrà stampato sullo stream corrente.
+;;; funzione, l'output verrï¿½ stampato sullo stream corrente.
+
 (defun urilib-display (uri &optional (stream T))
   (format stream "Schema:~13T~S~%" (urilib-scheme uri))
   (format stream "Userinfo:~13T~S~%" (urilib-userinfo uri))
@@ -110,7 +112,7 @@
 ;;; Estrazione dei componenti dell'Authority che vengono restituiti
 ;;; all'interno di un AUTHORITY-STRUCT.
 (defun extract-authority (chars)
-  ;; Nel primo caso l'Authority è presente
+  ;; Nel primo caso l'Authority ï¿½ presente
   (cond ((and (string= (first chars) "/")
 	      (string= (second chars) "/"))
 	 (progn
@@ -128,7 +130,7 @@
 			    (error "invalid port")
 			    port))
 		      "80"))))
-        ;; Nel secondo caso l'Authority non è presente
+        ;; Nel secondo caso l'Authority non ï¿½ presente
         ((and (string= (first chars) "/")
 	      (not (string= (second chars) "/")))
 	 (progn
@@ -171,8 +173,24 @@
 	       (error "invalid userinfo character")))))
 
 ;;; Riconosce IPv4 validi
-;;(defun valid-ipv4-p (chars)
+;; (defun valid-ipv4-p (chars)
 ;;  )
+
+"  Verifica se un ottetto rappresentato da 3 numeri Ã¨ valido.
+(defun octet (codes)
+  (cond
+   ((and (numberp (first codes))
+         (numberp (second codes))
+         (numberp (third codes)))
+    (let ((value (+ (* 100 (first codes))
+                   (* 10 (second codes))
+                   (third codes))))
+      (if (and (>= value 0) (<= value 255))  ; Verifica che l'ottetto sia tra 0 e 255
+          (list value (rest codes))         ; Restituisce il valore valido e il resto della lista
+          (error "Invalid IP octet: Value out of range."))))
+   (T (error "Invalid IP octet: Not all elements are numbers."))))"
+; sbagliato perchÃ¨ csÃ¬ considera solo se ogni ottetto ha 3 elementi da implementare anche per 2 sole cifre e 1 sola cifra
+
 
 ;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi.
 (defun extract-host (chars)
