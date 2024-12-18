@@ -1,5 +1,5 @@
 ;;;; Pomi Beatrice 914386
-;;;; Invernizzi Gloria MATRICOLA
+;;;; Invernizzi Gloria 910243
 
 ;;;; -*- Mode: Lisp -*-
 
@@ -170,15 +170,31 @@
 		       (extract-userinfo (rest chars)))
 	       (error "invalid userinfo character")))))
 
-;;; Estrazione ricorsiva dei caratteri che compongono l'Host.
+;;; Riconosce IPv4 validi
+;;(defun valid-ipv4-p (chars)
+;;  )
+
+;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi.
 (defun extract-host (chars)
+  (cond
+   ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
+   ;;(valid-ipv4-p chars)
+   ;; Caso: la stringa inizia con una lettera
+   ((and (not (null chars)) (alpha-char-p (first chars)))
+    (extract-host-ricorsiva (rest chars)))
+
+   (error "invalid host")))
+
+
+;;; Estrazione ricorsiva dei caratteri che compongono l'Host.
+(defun extract-host-ricorsiva (chars)
   (cond ((contains-separator chars "@")
-	 (extract-host (rest chars)))
+	 (extract-host-ricorsiva (rest chars)))
 	((string= (first chars) ":") NIL)
 	((null chars) NIL)
 	(T (if (identificatorep (first chars))
 	       (append (list (first chars))
-		       (extract-host (rest chars)))
+		       (extract-host-ricorsiva (rest chars)))
 	       (error "invalid host character")))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono Port.
@@ -400,5 +416,6 @@
       (string= char ",")
       (string= char ";")
       (string= char "=")))
+
 
 ;;;; urilib-parse.lisp ends here.
