@@ -492,19 +492,16 @@ octet([A | After], Octet, After):-
 parse_port([], Port, After) :-
     Port = [],
     After = [].
-
 parse_port([C | Codes], Port, After) :-
     C = 47, % Codice ASCII per /
     !,
     Port = [],
     After = [C | Codes].
-
 parse_port([C | Codes], Port, After) :-
     is_digit(C),
     !,
     parse_port(Codes, P, After),
     Port = [C | P].
-
 port([C | Codes], Port, After) :-
     C = 58, % Codice ASCII per :
     !,
@@ -518,31 +515,18 @@ port([C | Codes], Port, After) :-
 parse_path([], Path, After) :-
     Path = [],
     After = [].
-
 parse_path([C | Codes], Path, After) :-
-    C = 63,  % Codice ASCII per ?
+    (C = 63;  % Codice ASCII per ?
+     C = 35), % Codice ASCII per #
     !,
     Path = [],
     After = [C | Codes].
-
 parse_path([C | Codes], Path, After) :-
-    C = 35, % Codice ASCII per #
-    !,
-    Path = [],
-    After = [C | Codes].
-
-parse_path([C | Codes], Path, After) :-
-    identificatore(C),
+    (identificatore(C);
+     C = 47), % Codice ASCII per /
     !,
     parse_path(Codes, P, After),
     Path = [C | P].
-
-parse_path([C | Codes], Path, After) :-
-    C = 47, % Codice ASCII per /
-    !,
-    parse_path(Codes, P, After),
-    Path = [C | P].
-
 path([C | Codes], Path, After) :-
     C = 47, % Codice ASCII per /
     !,
@@ -583,21 +567,14 @@ zos_path([C | Codes]) :-
 id44([], Id44, After) :-
     Id44 = [],
     After = [].
-
 id44([C | Codes], Id44, After) :-
     C = 40, % Codice ASCII per (
     !,
     Id44 = [],
     After = [C | Codes].
-
 id44([C | Codes], Id44, After) :-
-    is_alnum(C),
-    !,
-    id44(Codes, I, After),
-    Id44 = [C | I].
-
-id44([C | Codes], Id44, After) :-
-    C = 46, % Codice ASCII per .
+    (is_alnum(C);
+     C = 46), % Codice ASCII per .
     !,
     id44(Codes, I, After),
     Id44 = [C | I].
@@ -611,13 +588,11 @@ parse_id8([C | []], Id8) :-
     C = 41, % Codice ASCII per )
     !,
     Id8 = [].
-
 parse_id8([C | Codes], Id8) :-
     is_alnum(C),
     !,
     parse_id8(Codes, I),
     Id8 = [C | I].
-
 id8([C1, C2 | Codes], Id8) :-
     C1 = 40, % Codice ASCII per (
     is_alnum(C2),
@@ -631,19 +606,16 @@ id8([C1, C2 | Codes], Id8) :-
 parse_query([], Query, After) :-
     Query = [],
     After = [].
-
 parse_query([C | Codes], Query, After) :-
     C = 35, % Codice ASCII per #
     !,
     Query = [],
     After = [C | Codes].
-
 parse_query([C | Codes], Query, After) :-
     caratteri(C),
     !,
     parse_query(Codes, Q, After),
     Query = [C | Q].
-
 query([C | Codes], Query, After) :-
     C = 63, % Codice ASCII per ?
     !,
@@ -656,13 +628,11 @@ query([C | Codes], Query, After) :-
 parse_fragment([], Fragment, After) :-
     Fragment = [],
     After = [].
-
 parse_fragment([C | Codes], Fragment, After) :-
     caratteri(C),
     !,
     parse_fragment(Codes, F, After),
     Fragment = [C | F].
-
 fragment([C | Codes], Fragment, After) :-
     C = 35, % Codice ASCII per #
     !,
