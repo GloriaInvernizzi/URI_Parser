@@ -8,38 +8,30 @@
 %%%% RFC3986 (https://datatracker.ietf.org/doc/html/rfc3986)
 
 %   urilib_parse(URIString, URI)
-%
-%   Scomposizione di un URI nei suoi componenti, partendo dal parsing dello
-%   Schema, ed applicando le regole sintattiche collegate ad esso.
-
 urilib_parse(URIString, URI) :-
     string(URIString),
-    atom_codes(URIString, Codes),
+        % Trasforma la stringa URISTRING in una lista, ad ogni carattere associa il codice ascii e mette il risultato in Codes
+    atom_codes(URIString, Codes),   % atoms_code � una funzione valida per coerce in prolog (casting)
     schema(Codes, SchemaCodes, AfterSchema),
-    atom_codes(Schema, SchemaCodes),
-    parse_uri_with_schema(Schema, AfterSchema, URI).
+    atom_codes(Schema, SchemaCodes), % trasforma lista in string, invesro, incognita in questo caso � Scheme
+    parse_uri_with_schema(Schema, AfterSchema, URI). % parser URI based to uri scheme structure
 
-%   urilib_display(URI)
-%   urilib_display(URI, Stream)
-%
-%   Metodi per stampare l'URI passato in input sullo stream di
-%   destinazione. Nel caso di urilib_display/1 l'URI verr� stampato
-%   sullo stream corrente.
+%   schema(Codes, Schema, After)
+%   Definition of the scheme (http, https, ftp, mailto, file, zos ...)
 
-urilib_display(URI) :-
-    current_output(Stream),
-    urilib_display(URI, Stream).
+% base
+schema([C | Codes], Schema, After) :-
+    C = 58, % Codice ASCII per :
+    !,
+    Schema = [],  % Scheme � tutto quello che c'� prima del :, after � tutto quello che c'� dopo
+    After = Codes.
 
-urilib_display(URI, Stream) :-
-    URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment),
-    format(Stream, 'Schema = ~w\n', [Schema]),
-    format(Stream, 'Userinfo = ~w\n', [Userinfo]),
-    format(Stream, 'Host = ~w\n', [Host]),
-    format(Stream, 'Port = ~w\n', [Port]),
-    format(Stream, 'Path = ~w\n', [Path]),
-    format(Stream, 'Query = ~w\n', [Query]),
-    format(Stream, 'Fragment = ~w\n', [Fragment]),
-    close(Stream).
+% induttivo
+schema([C | Codes], Schema, After) :-
+    identificatore(C), % if C is an acetpet char
+    !,
+    schema(Codes, S, After),
+    Schema = [C | S].
 
 %   parse_uri_with_schema(Schema, AfterSchema, URI)
 %
@@ -48,12 +40,13 @@ urilib_display(URI, Stream) :-
 %   mancanti da quello che si trova dopo lo Schema, passato come
 %   AfterSchema.
 
-%   Uno Schema seguito dal nulla � un URI valido.
+%   Uno Schema seguito dal nulla è un URI valido.
 parse_uri_with_schema(Schema, [], URI) :-
     !,
     URI = uri(Schema, [], [], 80, [], [], []).
 
 %   Parse di un URI senza Fragment secondo il formato dello Schema zos.
+%   parse_uri_with_schema(String, List, struct)
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -61,8 +54,8 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     zos_path(PathCodes),
     query(AfterPath, QueryCodes, []),
     !,
-    atom_codes(Path, PathCodes),
-    atom_codes(Query, QueryCodes),
+    atom_codes(Path, PathCodes),    % traformate in stringhe
+    atom_codes(Query, QueryCodes),  % trasformate in stringhe
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, []).
 
 %   Parse di un URI senza Query secondo il formato dello Schema zos.
@@ -85,7 +78,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     zos_path(PathCodes),
     !,
     atom_codes(Path, PathCodes),
-    URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], []). % uri senza fragment
 
 %   Parse di un URI completo secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
@@ -222,21 +215,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Userinfo, U),
     URI = uri(Schema, Userinfo, [], [], [], [], []).
 
-%   schema(Codes, Schema, After)
-%
-%   Lo Schema viene estratto dai codici passati in input.
-
-schema([C | Codes], Schema, After) :-
-    C = 58, % Codice ASCII per :
-    !,
-    Schema = [],
-    After = Codes.
-schema([C | Codes], Schema, After) :-
-    identificatore(C),
-    !,
-    schema(Codes, S, After),
-    Schema = [C | S].
-
 %   authority(Codes, Userinfo, Host, Port, After)
 %
 %   I componenti dell'Authority vengono estratti dai codici passati in input.
@@ -318,8 +296,7 @@ userinfo([C | Codes], Userinfo, After) :-
 %   plain_userinfo(Codes, Userinfo, After)
 %
 %   Lo Userinfo viene estratto dai codici passati in input. In questo caso
-%   lo Userinfo pu� essere l'unico componente presente all'interno di un
-%   URI.
+%   lo Userinfo può essere l'unico componente presente all'interno di un URI
 
 plain_userinfo([], Userinfo, After) :-
     Userinfo = [],
@@ -383,6 +360,7 @@ is_letter(C) :-
 %   L'Host viene estratto dai codici passati in input, se il formato dell'Host
 %   corrisponde a quello di un indirizzo IP.
 %   46 � il codice ASCII per .
+% 192.168.156.12 ==> ipv4, 32 bit === 4 byte, 4 ottetti di bit, ogni ottetto separato da un punto
 
 ip(Codes, Host, After):-
     octet(Codes, FirstOctet, [46 | AfterFirstOctet]),
@@ -407,7 +385,7 @@ octet([A, B, C | After], Octet, After):-
     is_digit(B),
     is_digit(C),
     number_codes(Number, [A, B, C]),
-    Number =< 255,
+    Number =< 255, % 2^8 ==> 0-255
     Number >= 0,
     Octet = [A, B, C],
     !.
@@ -491,7 +469,7 @@ zos_path([C | Codes]) :-
     length(Id44Codes, Id44Length),
     Id44Length =< 44,
     last(Id44Codes, LastId44Character),
-    LastId44Character \= 46.
+    LastId44Character \= 46. % . in ASCII
 
 %   Parse del Path contenente Id44 e Id8 secondo il formato dello Schema zos.
 zos_path([C | Codes]) :-
@@ -500,7 +478,7 @@ zos_path([C | Codes]) :-
     length(Id44Codes, Id44Length),
     Id44Length =< 44,
     last(Id44Codes, LastId44Character),
-    LastId44Character \= 46,
+    LastId44Character \= 46,        % . in ASCII non può essere x lo schema zos
     id8(AfterId44Codes, Id8Codes),
     length(Id8Codes, Id8Length),
     Id8Length =< 8.
@@ -510,6 +488,7 @@ zos_path([C | Codes]) :-
 %   Viene estratto l'Id44 dai codici passati in input che compongono un Path,
 %   secondo il formato dello Schema zos.
 
+% mette in id44 tutti i caratteri + . che ci sono tra lo schema e il carattere (
 id44([], Id44, After) :-
     Id44 = [],
     After = [].
@@ -538,7 +517,7 @@ parse_id8([C | Codes], Id8) :-
     is_alnum(C),
     !,
     parse_id8(Codes, I),
-    Id8 = [C | I].
+    Id8 = [C | I]. % Id8 contiene tutti i caratteri compresi tra le ()
 id8([C1, C2 | Codes], Id8) :-
     C1 = 40, % Codice ASCII per (
     is_alnum(C2),
@@ -583,6 +562,26 @@ fragment([C | Codes], Fragment, After) :-
     C = 35, % Codice ASCII per #
     !,
     parse_fragment(Codes, Fragment, After).
+
+%   urilib_display(URI)
+%   urilib_display(URI, Stream)
+%   sullo stream corrente.
+
+urilib_display(URI) :-
+    current_output(Stream),
+    urilib_display(URI, Stream).
+
+urilib_display(URI, Stream) :-
+    URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment),
+    format(Stream, 'Schema = ~w\n', [Schema]),
+    format(Stream, 'Userinfo = ~w\n', [Userinfo]),
+    format(Stream, 'Host = ~w\n', [Host]),
+    format(Stream, 'Port = ~w\n', [Port]),
+    format(Stream, 'Path = ~w\n', [Path]),
+    format(Stream, 'Query = ~w\n', [Query]),
+    format(Stream, 'Fragment = ~w\n', [Fragment]),
+    close(Stream).
+
 
 %   caratteri(Carattere)
 %
@@ -642,16 +641,7 @@ identificatore(C) :-
     C = 59;  % ;
     C = 61.  % =
 
-
-
 %%%% urilib-parse.pl ends here
-
-
-
-
-
-
-
 
 
 
