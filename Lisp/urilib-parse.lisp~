@@ -181,8 +181,7 @@
    ;;(valid-ipv4-p chars)
    ;; Caso: la stringa inizia con una lettera
    ((and (not (null chars)) (alpha-char-p (first chars)))
-    (append (list (first chars))
-            (extract-host-ricorsiva (rest chars))))
+    (extract-host-ricorsiva (rest chars)))
 
    (error "invalid host")))
 
