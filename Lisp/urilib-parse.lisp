@@ -173,36 +173,67 @@
 	       (error "invalid userinfo character")))))
 
 ;;; Riconosce IPv4 validi
-;; (defun valid-ipv4-p (chars)
-;;  )
+(defun valid-ipv4-p (chars)
+  (if (and (octet-p chars) (equal (first after-octet) #\.)) 
+      (setq ip (concatenate 'string (write-to-string value) "."))
+    (error "invalid form for ip 1"))
 
-"  Verifica se un ottetto rappresentato da 3 numeri Ã¨ valido.
-(defun octet (codes)
+  (if (and (octet-p (rest after-octet)) (first after-octet) #\.)
+      (setq ip (concatenate 'string ip (write-to-string value) "."))
+    (error "invalid form for ip 2"))
+
+  (if (and (octet-p (rest after-octet)) (first after-octet) #\.)
+      (setq ip (concatenate 'string ip (write-to-string value) "."))
+    (error "invalid form for ip 3"))
+
+  (if (and (octet-p (rest after-octet)))
+      (setq ip (concatenate 'string ip (write-to-string value)))
+    (error "invalid form for ip 4"))
+
+  ip
+)
+
+; Verifica se è un ottetto rappresentato da 1 o 2 o 3 numeri è valido.
+
+(defun octet-p (chars)
   (cond
-   ((and (numberp (first codes))
-         (numberp (second codes))
-         (numberp (third codes)))
-    (let ((value (+ (* 100 (first codes))
-                   (* 10 (second codes))
-                   (third codes))))
-      (if (and (>= value 0) (<= value 255))  ; Verifica che l'ottetto sia tra 0 e 255
-          (list value (rest codes))         ; Restituisce il valore valido e il resto della lista
-          (error "Invalid IP octet: Value out of range."))))
-   (T (error "Invalid IP octet: Not all elements are numbers."))))"
-; sbagliato perchÃ¨ csÃ¬ considera solo se ogni ottetto ha 3 elementi da implementare anche per 2 sole cifre e 1 sola cifra
-
+   ((null chars) NIL)
+   ((and (numberp (digit-char-p (first chars)))
+         (numberp (digit-char-p (second chars)))
+         (numberp (digit-char-p (third chars))))
+    (progn 
+      (setq value (+ (* 100 (digit-char-p (first chars)))
+                     (* 10 (digit-char-p (second chars)))
+                     (digit-char-p (third chars))))
+      (setq after-octet (rest (rest (rest chars))))
+      ))
+   ((and (numberp (digit-char-p (first chars))) (numberp (digit-char-p (second chars))))
+    (progn 
+      (setq value (+ (* 10 (digit-char-p (first chars))) (digit-char-p (second chars))))
+      (setq after-octet (rest (rest chars)))
+      ))
+   ((and (numberp (digit-char-p (first chars))))
+    (progn 
+      (setq value (digit-char-p (first chars)))
+      (setq after-octet (rest chars))
+      ))
+   (T (error "Invalid IP octet: Not all elements are numbers.")))
+  
+  (if (and (>= value 0) (<= value 255))  ; Verifica che l'ottetto sia tra 0 e 255
+      T         ; Restituisce il valore valido e il resto della lista
+    (error "Invalid IP octet: Value out of range.")))
 
 ;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi.
 (defun extract-host (chars)
   (cond
    ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
-   ;;(valid-ipv4-p chars)
+   ((valid-ipv4-p chars)
+    ip)
    ;; Caso: la stringa inizia con una lettera
    ((and (not (null chars)) (alpha-char-p (first chars)))
     (append (list (first chars))
             (extract-host-ricorsiva (rest chars))))
-
-   (error "invalid host")))
+   (T (error "invalid host"))))
 
 
 ;;; Estrazione ricorsiva dei caratteri che compongono l'Host.
@@ -256,7 +287,7 @@
 	 (progn
 	   (defparameter after chars)
 	   NIL))
-	(T (if (caratterip (first chars))
+	(T (if (identificatorep (first chars))
 	       (append (list (first chars))
 		       (extract-query-chars (rest chars)))
 	       (error "invalid query character")))))
@@ -271,7 +302,7 @@
 	 (progn
 	   (defparameter after NIL)
 	   NIL))
-	(T (if (caratterip (first chars))
+	(T (if (caratterep (first chars))
 	       (append (list (first chars))
 		       (extract-fragment-chars (rest chars)))
 	       (error "invalid fragment character")))))
@@ -386,7 +417,7 @@
 
 ;;; Viene stabilito se il carattere passato in input corrisponde
 ;;; ad uno dei caratteri accettati dalla specifica corrente.
-(defun caratterip (char)
+(defun identificatorep (char)
   (or (alphanumericp char)
       (string= char " ")
       (string= char "-")
@@ -412,29 +443,9 @@
       (string= char ";")
       (string= char "=")))
 
-;;; Tramite questo subset di caratteri, usato in alcuni componenti
-;;; dell'URI, viene stabilito se il carattere passato in input
-;;; corrisponde ad uno dei caratteri accettati dalla specifica corrente.
-(defun identificatorep (char)
+; function for fragment
+(defun caratterep (char)
   (or (alphanumericp char)
-      (string= char " ")
-      (string= char "-")
-      (string= char ".")
-      (string= char "_")
-      (string= char "~")
-      (string= char "[")
-      (string= char "]")
-      (string= char "!")
-      (string= char "$")
-      (string= char "&")
-      (string= char "'")
-      (string= char "(")
-      (string= char ")")
-      (string= char "*")
-      (string= char "+")
-      (string= char ",")
-      (string= char ";")
-      (string= char "=")))
-
+      (string= char "_")))
 
 ;;;; urilib-parse.lisp ends here.
