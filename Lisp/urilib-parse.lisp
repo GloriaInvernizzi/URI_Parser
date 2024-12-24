@@ -131,10 +131,13 @@
 			    port))
 		      "80"))))
         ;; Nel secondo caso l'Authority non � presente
-        ((and (string= (first chars) "/")
+        ((or (and (string= (first chars) "/")
 	      (not (string= (second chars) "/")))
+             (string= (first chars) "?")
+             (string= (first chars) "#")
+             (alpha-char-p (first chars)))
 	 (progn
-	   (defparameter after chars)
+	   (setq after chars)
 	   (make-authority-struct
 	    :userinfo NIL
 	    :host NIL
@@ -174,21 +177,21 @@
 
 ;;; Riconosce IPv4 validi
 (defun valid-ipv4-p (chars)
-  (if (and (octet-p chars) (equal (first after-octet) #\.)) 
+  (if (and (octet-p chars) (string= (first after-octet) ".")) 
       (setq ip (concatenate 'string (write-to-string value) "."))
-    (error "invalid form for ip 1"))
+    (return-from valid-ipv4-p NIL))
 
-  (if (and (octet-p (rest after-octet)) (first after-octet) #\.)
+  (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
       (setq ip (concatenate 'string ip (write-to-string value) "."))
-    (error "invalid form for ip 2"))
+    (return-from valid-ipv4-p NIL))
 
-  (if (and (octet-p (rest after-octet)) (first after-octet) #\.)
+  (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
       (setq ip (concatenate 'string ip (write-to-string value) "."))
-    (error "invalid form for ip 3"))
+    (return-from valid-ipv4-p NIL))
 
   (if (and (octet-p (rest after-octet)))
       (setq ip (concatenate 'string ip (write-to-string value)))
-    (error "invalid form for ip 4"))
+    (return-from valid-ipv4-p NIL))
 
   ip
 )
@@ -197,17 +200,22 @@
 
 (defun octet-p (chars)
   (cond
-   ((null chars) NIL)
+   ((null chars) (return-from octet-p NIL))
    ((and (numberp (digit-char-p (first chars)))
-         (numberp (digit-char-p (second chars)))
-         (numberp (digit-char-p (third chars))))
+         (and 
+          (not (null (second chars))) 
+          (numberp (digit-char-p (second chars))))
+         (and (not (null (third chars))) (numberp (digit-char-p (third chars)))))
     (progn 
       (setq value (+ (* 100 (digit-char-p (first chars)))
                      (* 10 (digit-char-p (second chars)))
                      (digit-char-p (third chars))))
       (setq after-octet (rest (rest (rest chars))))
       ))
-   ((and (numberp (digit-char-p (first chars))) (numberp (digit-char-p (second chars))))
+   ((and (numberp (digit-char-p (first chars))) 
+         (and 
+          (not (null (second chars))) 
+          (numberp (digit-char-p (second chars)))))
     (progn 
       (setq value (+ (* 10 (digit-char-p (first chars))) (digit-char-p (second chars))))
       (setq after-octet (rest (rest chars)))
@@ -217,7 +225,7 @@
       (setq value (digit-char-p (first chars)))
       (setq after-octet (rest chars))
       ))
-   (T (error "Invalid IP octet: Not all elements are numbers.")))
+   (T (return-from octet-p NIL)))
   
   (if (and (>= value 0) (<= value 255))  ; Verifica che l'ottetto sia tra 0 e 255
       T         ; Restituisce il valore valido e il resto della lista
@@ -226,13 +234,13 @@
 ;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi.
 (defun extract-host (chars)
   (cond
-   ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
-   ((valid-ipv4-p chars)
-    ip)
    ;; Caso: la stringa inizia con una lettera
    ((and (not (null chars)) (alpha-char-p (first chars)))
     (append (list (first chars))
             (extract-host-ricorsiva (rest chars))))
+   ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
+   ((valid-ipv4-p chars)
+    ip)
    (T (error "invalid host"))))
 
 
@@ -261,7 +269,9 @@
 ;;; con controllo sull'esistenza di "/" come primo carattere.
 (defun extract-path (chars)
   (cond ((string= (first chars) "/")
-	 (extract-path-chars (rest chars)))))
+         (extract-path-chars (rest chars)))
+        ((alpha-char-p (first chars))
+         (extract-path-chars chars))))
 
 (defun extract-path-chars (chars)
   (cond ((null chars) NIL)
@@ -353,7 +363,7 @@
 	    :port (parse-integer (coerce
 				  (authority-struct-port authority)
 				  'string))
-	    :path (if (contains-separator after "/")
+	    :path (if (or (contains-separator after "/") (alpha-char-p (first after)))
 		      (coerce (extract-zos-path after) 'string)
 		      (error "missing path"))
 	    :query (if (contains-separator after "?")
@@ -375,10 +385,14 @@
         ((and (contains-separator chars "(")
 	      (contains-separator chars ")"))
 	 (progn
-	   (setq id44-chars (id44 (rest chars)))
+           (if (alpha-char-p (first chars)) 
+               (setq id44-chars (id44 chars))
+             (setq id44-chars (id44 (rest chars))))
 	   (setq id8-chars (id8 after))
 	   (cond ((or (< (length id44-chars) 1)
-		      (< (length id8-chars) 1))
+                      (> (length id44-chars) 44)
+		      (< (length id8-chars) 1)
+                      (> (length id8-chars) 8))
 		  (error "invalid sequence")))
 	   (append id44-chars '(#\() id8-chars '(#\)))))
 	(T (progn
@@ -396,7 +410,7 @@
 	 NIL)
 	((or (alphanumericp (first chars)) (string= (first chars) "."))
 	 (progn
-	   (defparameter after (rest chars))
+	   (setq after (rest chars))
 	   (append (list (first chars)) (id44 (rest chars)))))
 	(T (error "invalid id44 character"))))
 
@@ -406,12 +420,12 @@
 	 (id8 (rest chars)))
 	((string= (first chars) ")")
 	 (progn
-	   (defparameter after (rest chars))
+	   (setq after (rest chars))
 	   NIL))
 	((null chars) (error "invalid id8"))
 	((alphanumericp (first chars))
 	 (progn
-	   (defparameter after (rest chars))
+	   (setq after (rest chars))
 	   (append (list (first chars)) (id8 (rest chars)))))
 	(T (error "invalid id8 character"))))
 
