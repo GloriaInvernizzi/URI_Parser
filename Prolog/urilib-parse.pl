@@ -9,11 +9,11 @@
 
 %   urilib_parse(URIString, URI)
 urilib_parse(URIString, URI) :-
+    % Trasforma la stringa URISTRING in una lista, ad ogni carattere associa il codice ascii e mette il risultato in Codes
     string(URIString),
-        % Trasforma la stringa URISTRING in una lista, ad ogni carattere associa il codice ascii e mette il risultato in Codes
-    atom_codes(URIString, Codes),   % atoms_code ï¿½ una funzione valida per coerce in prolog (casting)
+    atom_codes(URIString, Codes),   % atoms_code è una funzione valida per coerce in prolog (casting)
     schema(Codes, SchemaCodes, AfterSchema),
-    atom_codes(Schema, SchemaCodes), % trasforma lista in string, invesro, incognita in questo caso ï¿½ Scheme
+    atom_codes(Schema, SchemaCodes), % trasforma lista in string, inverso, incognita in questo caso è Scheme
     parse_uri_with_schema(Schema, AfterSchema, URI). % parser URI based to uri scheme structure
 
 %   schema(Codes, Schema, After)
@@ -23,7 +23,7 @@ urilib_parse(URIString, URI) :-
 schema([C | Codes], Schema, After) :-
     C = 58, % Codice ASCII per :
     !,
-    Schema = [],  % Scheme ï¿½ tutto quello che c'ï¿½ prima del :, after ï¿½ tutto quello che c'ï¿½ dopo
+    Schema = [],  % Scheme è tutto quello che c'è prima del :, after è tutto quello che c'è dopo
     After = Codes.
 
 % induttivo
@@ -40,7 +40,7 @@ schema([C | Codes], Schema, After) :-
 %   mancanti da quello che si trova dopo lo Schema, passato come
 %   AfterSchema.
 
-%   Uno Schema seguito dal nulla Ã¨ un URI valido.
+%   Uno Schema seguito dal nulla è un URI valido.
 parse_uri_with_schema(Schema, [], URI) :-
     !,
     URI = uri(Schema, [], [], 80, [], [], []).
@@ -317,7 +317,8 @@ authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     atom_codes(Host, H),
     Port = 80.
 
-%   Parse di Authority non presente, quindi si passa direttamente al Path.
+%   Parse di Authority non presente, quindi si passa direttamente al
+%   Path che ha il separatore /.
 authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     C1 = 47,  % Codice ASCII per /
     C2 \= 47, % Codice ASCII per /
@@ -326,6 +327,16 @@ authority([C1, C2 | Chars], Userinfo, Host, Port, After) :-
     Host = [],
     Port = 80,
     After = [C1, C2 | Chars].
+
+%   Parse di Authority non presente, quindi si passa direttamente al
+%   Path che non ha il separatore /.
+authority([C | Chars], Userinfo, Host, Port, After) :-
+    identificatore(C),
+    !,
+    Userinfo = [],
+    Host = [],
+    Port = 80,
+    After = [C | Chars].
 
 %   userinfo(Codes, Userinfo, After)
 %
@@ -346,7 +357,8 @@ userinfo([C | Codes], Userinfo, After) :-
 %   plain_userinfo(Codes, Userinfo, After)
 %
 %   Lo Userinfo viene estratto dai codici passati in input. In questo caso
-%   lo Userinfo puÃ² essere l'unico componente presente all'interno di un URI
+%   lo Userinfo può essere l'unico componente presente all'interno di un
+%   URI
 
 plain_userinfo([], Userinfo, After) :-
     Userinfo = [],
@@ -369,10 +381,6 @@ plain_userinfo([C | Codes], Userinfo, After) :-
 %   L'Host viene estratto dai codici passati in input.
 %   Fondamentale che il primo carattere sia una lettera
 
-host([], Host, After) :-
-    Host = [],
-    After = [].
-
 host([First | Codes], Host, After) :-
     is_letter(First),
     !,
@@ -383,19 +391,33 @@ host([First | Codes], Host, After) :-
 %
 %   Verifica che la restante parte del Codes (tolto il primo carattere)
 %   sia una stringa valida
+
 identificatore_host([], Host, After) :-
     Host = [],
     After = [].
 
 identificatore_host([C | Codes], Host, After) :-
-    (C = 58;  % Codice ASCII per :
-     C = 47), % Codice ASCII per /
+    C = 58,  % Codice ASCII per :
     !,
     Host = [],
     After = [C | Codes].
 
 identificatore_host([C | Codes], Host, After) :-
-    identificatore(C),
+    C = 47, % Codice ASCII per /
+    !,
+    Host = [],
+    After = [C | Codes].
+
+identificatore_host([C | Codes], Host, After) :-
+    C = 46, % Codice ASCII per .
+    Codes = [C2 | _],
+    is_letter(C2),
+    !,
+    identificatore_host(Codes, P, After),
+    Host = [C | P].
+
+identificatore_host([C | Codes], Host, After) :-
+    carattere(C),
     !,
     identificatore_host(Codes, P, After),
     Host = [C | P].
@@ -412,7 +434,7 @@ is_letter(C) :- C >= 97, C =< 122. % Minuscole (a-z)
 %
 %   L'Host viene estratto dai codici passati in input, se il formato dell'Host
 %   corrisponde a quello di un indirizzo IP.
-%   46 ï¿½ il codice ASCII per .
+%   46 è il codice ASCII per .
 % 192.168.156.12 ==> ipv4, 32 bit === 4 byte, 4 ottetti di bit, ogni ottetto separato da un punto
 
 ip(Codes, Host, After):-
@@ -508,21 +530,31 @@ parse_path([C | Codes], Path, After) :-
     Path = [],
     After = [C | Codes].
 
+parse_path([C1, C2 | Codes], Path, After) :-
+    C1 = 47,  % Codice ASCII per /
+    C2 = 47,  % Controllo di non avere // nel path
+    !,
+    Path = [],
+    After = [C1, C2 | Codes].
+
 parse_path([C | Codes], Path, After) :-
     identificatore(C),
     !,
     parse_path(Codes, P, After),
     Path = [C | P].
 
-parse_path([C | Codes], Path, After) :-
-    C = 47, % Codice ASCII per /
-    !,
-    parse_path(Codes, P, After),
-    Path = [C | P].
-
+% Parse del Path che inizia con /
 path([C | Codes], Path, After) :-
-    C = 47, % Codice ASCII per /
+    C = 47,  % Codice ASCII per /
+    Codes = [C2 | _ ],
+    C2 \= 47,  % Controllo di non avere // all'inizio del path
     !,
+    parse_path(Codes, Path, After).
+
+% Parse del Path che non inizia con /
+path(Codes, Path, After) :-
+    Codes = [C | _],
+    C \= 58,   % Controllo di non avere : all'inizio del path
     parse_path(Codes, Path, After).
 
 %   zos_path(Codes)
@@ -616,7 +648,7 @@ parse_query([C | Codes], Query, After) :-
     After = [C | Codes].
 
 parse_query([C | Codes], Query, After) :-
-    caratteri(C),
+    identificatore(C),
     !,
     parse_query(Codes, Q, After),
     Query = [C | Q].
@@ -635,7 +667,7 @@ parse_fragment([], Fragment, After) :-
     After = [].
 
 parse_fragment([C | Codes], Fragment, After) :-
-    caratteri(C),
+    carattere(C),
     !,
     parse_fragment(Codes, F, After),
     Fragment = [C | F].
@@ -665,12 +697,12 @@ urilib_display(URI, Stream) :-
     close(Stream).
 
 
-%   caratteri(Carattere)
+%   identificatore(Carattere)
 %
 %   Viene stabilito se il carattere passato in input corrisponde ad uno dei
 %   caratteri accettati dalla specifica corrente.
 
-caratteri(C) :-
+identificatore(C) :-
     is_alnum(C);
     C = 32;  % Space
     C = 45;  % -
@@ -696,31 +728,22 @@ caratteri(C) :-
     C = 59;  % ;
     C = 61.  % =
 
-%   identificatore(Carattere)
+%   carattere(Carattere)
 %
-%   Tramite questo subset di caratteri, usato in alcuni componenti dell'URI,
-%   viene stabilito se il carattere passato in input corrisponde ad uno dei
+%   Viene stabilito se il carattere passato in input corrisponde ad uno dei
 %   caratteri accettati dalla specifica corrente.
 
-identificatore(C) :-
+carattere(C) :-
     is_alnum(C);
-    C = 32;  % Space
-    C = 45;  % -
-    C = 46;  % .
-    C = 95;  % _
-    C = 126; % ~
-    C = 91;  % [
-    C = 93;  % ]
-    C = 33;  % !
-    C = 36;  % $
-    C = 38;  % &
-    C = 39;  % '
-    C = 40;  % (
-    C = 41;  % )
-    C = 42;  % *
-    C = 43;  % +
-    C = 44;  % ,
-    C = 59;  % ;
-    C = 61.  % =
+    C = 95.  % _
+
 
 %%%% urilib-parse.pl ends here
+
+
+
+
+
+
+
+
