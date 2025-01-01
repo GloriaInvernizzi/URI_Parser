@@ -75,9 +75,7 @@
 		   :port (parse-integer (coerce
 					 (authority-struct-port authority)
 					 'string))
-		   :path (if (contains-separator after "/")
-			     (coerce (extract-path after) 'string)
-			     NIL)
+		   :path (coerce (extract-path after) 'string)
 		   :query (if (contains-separator after "?")
 			      (coerce (extract-query after) 'string)
 			      NIL)
@@ -130,7 +128,7 @@
 			    (error "invalid port")
 			    port))
 		      "80"))))
-        ;; Nel secondo caso l'Authority non ï¿½ presente
+        ;; Nel secondo caso l'Authority non è presente
         ((or (and (string= (first chars) "/")
 	      (not (string= (second chars) "/")))
              (string= (first chars) "?")
@@ -152,6 +150,9 @@
 	 (progn
 	   (defparameter after chars)
 	   NIL))
+        ((and (string= (first chars) ".")
+              (string= (second chars) "."))
+         (error "invalid sintax"))
 	((null chars)
 	 (progn
 	   (defparameter after NIL)
@@ -433,29 +434,8 @@
 ;;; ad uno dei caratteri accettati dalla specifica corrente.
 (defun identificatorep (char)
   (or (alphanumericp char)
-      (string= char " ")
-      (string= char "-")
       (string= char ".")
-      (string= char "_")
-      (string= char "~")
-      (string= char ":")
-      (string= char "/")
-      (string= char "?")
-      (string= char "#")
-      (string= char "[")
-      (string= char "]")
-      (string= char "@")
-      (string= char "!")
-      (string= char "$")
-      (string= char "&")
-      (string= char "'")
-      (string= char "(")
-      (string= char ")")
-      (string= char "*")
-      (string= char "+")
-      (string= char ",")
-      (string= char ";")
-      (string= char "=")))
+      (string= char "_")))
 
 ; function for fragment
 (defun caratterep (char)
