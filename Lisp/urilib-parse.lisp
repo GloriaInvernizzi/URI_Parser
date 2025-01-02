@@ -346,7 +346,7 @@
 	  :userinfo (cond ((contains-separator chars "@")
                            (error "invalid userinfo"))
                           ((string= (first chars) "+") 
-                           (coerce (extract-userinfo (rest chars)) 'string))
+                           (coerce (append '(#\+) (extract-userinfo (rest chars))) 'string))
                           (T (coerce (extract-userinfo chars) 'string)))
 	  :port 80))
 	((string= schema "zos") ; parsing zos
