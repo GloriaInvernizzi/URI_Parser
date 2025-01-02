@@ -747,28 +747,14 @@ urilib_display(URI, Stream) :-
 
 identificatore(C) :-
     is_alnum(C);
-    C = 32;  % Space
-    C = 45;  % -
     C = 46;  % .
     C = 95;  % _
-    C = 126; % ~
-    C = 58;  % :
     C = 47;  % /
     C = 63;  % ?
-    C = 35;  % #
-    C = 91;  % [
-    C = 93;  % ]
-    C = 64;  % @
-    C = 33;  % !
-    C = 36;  % $
-    C = 38;  % &
-    C = 39;  % '
     C = 40;  % (
     C = 41;  % )
-    C = 42;  % *
+    C = 35;  % #
     C = 43;  % +
-    C = 44;  % ,
-    C = 59;  % ;
     C = 61.  % =
 
 %   carattere(Carattere)

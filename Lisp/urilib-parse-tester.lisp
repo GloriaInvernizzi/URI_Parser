@@ -7,10 +7,9 @@
 (defun test-urilib-parse ()
   "Esegue il comando urilib-parse su una lista di URI e stampa i risultati."
   (setq uris '( 
-               "http://123.123.12.123"
-               
                ; Validi
                "http://example.com"
+               "http://123.123.12.123"
                "http:path/to/file.pdf"
                "http:"
                "http:/"
