@@ -75,7 +75,9 @@
 		   :port (parse-integer (coerce
 					 (authority-struct-port authority)
 					 'string))
-		   :path (coerce (extract-path after) 'string)
+		   :path (if (null after)
+                             NIL
+                           (coerce (extract-path after) 'string))
 		   :query (if (contains-separator after "?")
 			      (coerce (extract-query after) 'string)
 			      NIL)
@@ -189,7 +191,6 @@
   (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
       (setq ip (concatenate 'string ip (write-to-string value) "."))
     (return-from valid-ipv4-p NIL))
-
   (if (and (octet-p (rest after-octet)))
       (setq ip (concatenate 'string ip (write-to-string value)))
     (return-from valid-ipv4-p NIL))
@@ -296,9 +297,9 @@
   (cond ((null chars) NIL)
 	((string= (first chars) "#")
 	 (progn
-	   (defparameter after chars)
+	   (setq after chars)
 	   NIL))
-	(T (if (identificatorep (first chars))
+	(T (if (or (identificatorep (first chars)) (string= (first chars) "="))
 	       (append (list (first chars))
 		       (extract-query-chars (rest chars)))
 	       (error "invalid query character")))))
@@ -313,7 +314,7 @@
 	 (progn
 	   (defparameter after NIL)
 	   NIL))
-	(T (if (caratterep (first chars))
+	(T (if (identificatorep (first chars))
 	       (append (list (first chars))
 		       (extract-fragment-chars (rest chars)))
 	       (error "invalid fragment character")))))
@@ -342,9 +343,11 @@
 	((or (string= schema "tel") (string= schema "fax")) ; parsing tel e fax
 	 (make-uri-struct
 	  :schema schema
-	  :userinfo (if (contains-separator chars "@")
-			(error "invalid userinfo")
-			(coerce (extract-userinfo chars) 'string))
+	  :userinfo (cond ((contains-separator chars "@")
+                           (error "invalid userinfo"))
+                          ((string= (first chars) "+") 
+                           (coerce (extract-userinfo (rest chars)) 'string))
+                          (T (coerce (extract-userinfo chars) 'string)))
 	  :port 80))
 	((string= schema "zos") ; parsing zos
 	 (progn
@@ -352,21 +355,27 @@
 	   (make-uri-struct
 	    :schema (coerce schema 'string)
 	    :userinfo (if (equal
-			   (authority-struct-userinfo authority)
-			   NIL)
-			  NIL
-			  (coerce
-			   (authority-struct-userinfo authority)
-			   'string))
-	    :host (coerce
-		   (authority-struct-host authority)
-		   'string)
-	    :port (parse-integer (coerce
-				  (authority-struct-port authority)
-				  'string))
-	    :path (if (or (contains-separator after "/") (alpha-char-p (first after)))
-		      (coerce (extract-zos-path after) 'string)
-		      (error "missing path"))
+                           (authority-struct-userinfo authority)
+                           NIL)
+                          NIL
+                        (coerce
+                         (authority-struct-userinfo authority)
+                         'string))
+            :host (coerce
+                   (authority-struct-host authority)
+                   'string)
+            :port (parse-integer 
+                   (coerce
+                    (authority-struct-port authority)
+                    'string))
+	    :path (cond ((null after) NIL)
+                        ((string= (first after) "/")
+                         (progn 
+                           (setq after (rest after))
+                           (coerce (extract-zos-path after) 'string)))
+                        ((alpha-char-p (first after))
+                         (coerce (extract-zos-path after) 'string))
+                        ((or (string= (first chars) "#") (string= (first chars) "?")) NIL))
 	    :query (if (contains-separator after "?")
 		       (coerce (extract-query after) 'string)
 		       NIL)
@@ -378,7 +387,8 @@
 
 ;;; Parsing del Path di un URI che corrisponde allo Schema "zos".
 (defun extract-zos-path (chars)
-  (cond ((or (and (contains-separator chars "(")
+  (cond ((null chars) NIL)
+        ((or (and (contains-separator chars "(")
 		  (not (contains-separator chars ")")))
 	     (and (not (contains-separator chars "("))
 		  (contains-separator chars ")")))
@@ -386,9 +396,7 @@
         ((and (contains-separator chars "(")
 	      (contains-separator chars ")"))
 	 (progn
-           (if (alpha-char-p (first chars)) 
-               (setq id44-chars (id44 chars))
-             (setq id44-chars (id44 (rest chars))))
+           (setq id44-chars (id44 chars))
 	   (setq id8-chars (id8 after))
 	   (cond ((or (< (length id44-chars) 1)
                       (> (length id44-chars) 44)
@@ -396,8 +404,9 @@
                       (> (length id8-chars) 8))
 		  (error "invalid sequence")))
 	   (append id44-chars '(#\() id8-chars '(#\)))))
+        ((or (string= (first chars) "#") (string= (first chars) "?")) NIL)
 	(T (progn
-	     (setq id44-chars (id44 (rest chars)))
+	     (setq id44-chars (id44 chars))
 	     (cond ((< (length id44-chars) 1)
 		    (error "invalid sequence")))
 	     id44-chars))))
@@ -435,11 +444,6 @@
 (defun identificatorep (char)
   (or (alphanumericp char)
       (string= char ".")
-      (string= char "_")))
-
-; function for fragment
-(defun caratterep (char)
-  (or (alphanumericp char)
       (string= char "_")))
 
 ;;;; urilib-parse.lisp ends here.
