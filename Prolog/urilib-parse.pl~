@@ -45,8 +45,102 @@ parse_uri_with_schema(Schema, [], URI) :-
     !,
     URI = uri(Schema, [], [], 80, [], [], []).
 
-%   Parse di un URI senza Fragment secondo il formato dello Schema zos.
+%   Parse di un URI contenente solo Userinfo secondo il formato dello Schema
+%   mailto.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'mailto',
+    plain_userinfo(AfterSchema, U, []),
+    !,
+    atom_codes(Userinfo, U),
+    URI = uri('mailto', Userinfo, [], [], [], [], []).
+
+%   Parse di un URI contenente Userinfo e Host secondo il formato dello Schema
+%   mailto.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'mailto',
+    !,
+    plain_userinfo(AfterSchema, U, AfterUserinfo),
+    host(AfterUserinfo, H, []),
+    atom_codes(Userinfo, U),
+    atom_codes(Host, H),
+    URI = uri('mailto', Userinfo, Host, [], [], [], []).
+
+%   Parse di un URI contenente solo Userinfo secondo il formato degli Schema
+%   tel e fax.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'tel',
+    write("ciao"),
+    !,
+    plain_userinfo(AfterSchema, U, []),
+    atom_codes(Userinfo, U),
+    URI = uri(Schema, Userinfo, [], [], [], [], []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'fax',
+    !,
+    plain_userinfo(AfterSchema, U, []),
+    atom_codes(Userinfo, U),
+    URI = uri(Schema, Userinfo, [], [], [], [], []).
+
+%   Parse di un URI contenente solo l'Host secondo il formato dello Schema news.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'news',
+    host(AfterSchema, H, []),
+    !,
+    atom_codes(Host, H),
+    URI = uri('news', [], Host, [], [], [], []).
+
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'news',
+    !,
+    ip(AfterSchema, H, []),
+    atom_codes(Host, H),
+    URI = uri('news', [], Host, [], [], [], []).
+
+%   Parse di un URI senza Path, Fragment e Query secondo il formato
+%   dello Schema zos.
 %   parse_uri_with_schema(String, List, struct)
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, []),
+    !,
+    URI = uri(Schema, Userinfo, Host, Port, [], [], []).
+
+%   Parse di un URI senza Path secondo il formato dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    query(AfterPath, QueryCodes, AfterQuery),
+    fragment(AfterQuery, FragmentCodes, []),
+    !,
+    atom_codes(Query, QueryCodes),
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], Query, Fragment).
+
+%   Parse di un URI senza Path e Fragment secondo il formato
+%   dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    query(AfterPath, QueryCodes, []),
+    !,
+    atom_codes(Query, QueryCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], Query, []).
+
+%   Parse di un URI senza Path e Query secondo il formato
+%   dello Schema zos.
+parse_uri_with_schema(Schema, AfterSchema, URI) :-
+    Schema = 'zos',
+    authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
+    path(AfterAuthority, [], AfterPath),
+    fragment(AfterPath, FragmentCodes, []),
+    !,
+    atom_codes(Fragment, FragmentCodes),
+    URI = uri(Schema, Userinfo, Host, Port, [], [], Fragment).
+
+%   Parse di un URI senza Fragment secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
     Schema = 'zos',
     authority(AfterSchema, Userinfo, Host, Port, AfterAuthority),
@@ -78,7 +172,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     zos_path(PathCodes),
     !,
     atom_codes(Path, PathCodes),
-    URI = uri(Schema, Userinfo, Host, Port, Path, [], []). % uri senza fragment
+    URI = uri(Schema, Userinfo, Host, Port, Path, [], []).
 
 %   Parse di un URI completo secondo il formato dello Schema zos.
 parse_uri_with_schema(Schema, AfterSchema, URI) :-
@@ -177,56 +271,6 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     atom_codes(Fragment, FragmentCodes),
     URI = uri(Schema, Userinfo, Host, Port, Path, Query, Fragment).
 
-%   Parse di un URI contenente solo Userinfo secondo il formato dello Schema
-%   mailto.
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'mailto',
-    plain_userinfo(AfterSchema, U, []),
-    !,
-    atom_codes(Userinfo, U),
-    URI = uri('mailto', Userinfo, [], [], [], [], []).
-
-%   Parse di un URI contenente Userinfo e Host secondo il formato dello Schema
-%   mailto.
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'mailto',
-    plain_userinfo(AfterSchema, U, AfterUserinfo),
-    host(AfterUserinfo, H, []),
-    !,
-    atom_codes(Userinfo, U),
-    atom_codes(Host, H),
-    URI = uri('mailto', Userinfo, Host, [], [], [], []).
-
-%   Parse di un URI contenente solo l'Host secondo il formato dello Schema news.
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'news',
-    host(AfterSchema, H, []),
-    !,
-    atom_codes(Host, H),
-    URI = uri('news', [], Host, [], [], [], []).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'news',
-    ip(AfterSchema, H, []),
-    !,
-    atom_codes(Host, H),
-    URI = uri('news', [], Host, [], [], [], []).
-
-%   Parse di un URI contenente solo Userinfo secondo il formato degli Schema
-%   tel e fax.
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'tel',
-    plain_userinfo(AfterSchema, U, []),
-    !,
-    atom_codes(Userinfo, U),
-    URI = uri(Schema, Userinfo, [], [], [], [], []).
-
-parse_uri_with_schema(Schema, AfterSchema, URI) :-
-    Schema = 'fax',
-    plain_userinfo(AfterSchema, U, []),
-    !,
-    atom_codes(Userinfo, U),
-    URI = uri(Schema, Userinfo, [], [], [], [], []).
 
 %   authority(Codes, Userinfo, Host, Port, After)
 %
@@ -381,10 +425,6 @@ plain_userinfo([C | Codes], Userinfo, After) :-
 %   L'Host viene estratto dai codici passati in input.
 %   Fondamentale che il primo carattere sia una lettera
 
-%host([], Host, After) :-
-%    Host = [],
-%    After = [].
-
 host([First | Codes], Host, After) :-
     is_letter(First),
     !,
@@ -395,6 +435,7 @@ host([First | Codes], Host, After) :-
 %
 %   Verifica che la restante parte del Codes (tolto il primo carattere)
 %   sia una stringa valida
+
 identificatore_host([], Host, After) :-
     Host = [],
     After = [].
