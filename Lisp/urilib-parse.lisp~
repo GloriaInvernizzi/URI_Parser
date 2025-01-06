@@ -12,6 +12,7 @@
 
 ;;; Ognuna di queste funzioni rappresenta l'estrazione di un singolo
 ;;; componente dall'URISTRUCT.
+
 (defun urilib-scheme (uri) (uri-struct-schema uri))
 (defun urilib-userinfo (uri) (uri-struct-userinfo uri))
 (defun urilib-host (uri) (uri-struct-host uri))
@@ -25,7 +26,8 @@
 
 ;;; Metodo di debug per stampare l'URI passato in input sullo stream
 ;;; di destinazione. Nel caso in cui stream non fosse passato alla
-;;; funzione, l'output verrà stampato sullo stream corrente.
+;;; funzione, l'output verrï¿½ stampato sullo stream corrente.
+
 (defun urilib-display (uri &optional (stream T))
   (format stream "Schema:~13T~S~%" (urilib-scheme uri))
   (format stream "Userinfo:~13T~S~%" (urilib-userinfo uri))
@@ -54,7 +56,8 @@
 	     :path NIL
 	     :query NIL
 	     :fragment NIL)
-	    (if (special-schema-p (coerce schema 'string)) ; caso "sintassi speciale"
+	    ; caso "sintassi speciale"
+	    (if (special-schema-p (coerce schema 'string))
 		(extract-special-uri (coerce schema 'string) after)
 		(progn
 	          (setq authority (extract-authority after))
@@ -73,9 +76,9 @@
 		   :port (parse-integer (coerce
 					 (authority-struct-port authority)
 					 'string))
-		   :path (if (contains-separator after "/")
-			     (coerce (extract-path after) 'string)
-			     NIL)
+		   :path (if (null after)
+                             NIL
+                           (coerce (extract-path after) 'string))
 		   :query (if (contains-separator after "?")
 			      (coerce (extract-query after) 'string)
 			      NIL)
@@ -110,7 +113,7 @@
 ;;; Estrazione dei componenti dell'Authority che vengono restituiti
 ;;; all'interno di un AUTHORITY-STRUCT.
 (defun extract-authority (chars)
-  ;; Nel primo caso l'Authority è presente
+  ;; Nel primo caso l'Authority ï¿½ presente
   (cond ((and (string= (first chars) "/")
 	      (string= (second chars) "/"))
 	 (progn
@@ -129,10 +132,13 @@
 			    port))
 		      "80"))))
         ;; Nel secondo caso l'Authority non è presente
-        ((and (string= (first chars) "/")
+        ((or (and (string= (first chars) "/")
 	      (not (string= (second chars) "/")))
+             (string= (first chars) "?")
+             (string= (first chars) "#")
+             (alpha-char-p (first chars)))
 	 (progn
-	   (defparameter after chars)
+	   (setq after chars)
 	   (make-authority-struct
 	    :userinfo NIL
 	    :host NIL
@@ -147,6 +153,9 @@
 	 (progn
 	   (defparameter after chars)
 	   NIL))
+        ((and (string= (first chars) ".")
+              (string= (second chars) "."))
+         (error "invalid sintax"))
 	((null chars)
 	 (progn
 	   (defparameter after NIL)
@@ -171,19 +180,73 @@
 	       (error "invalid userinfo character")))))
 
 ;;; Riconosce IPv4 validi
-;;(defun valid-ipv4-p (chars)
-;;  )
+(defun valid-ipv4-p (chars)
+  (if (and (octet-p chars) (string= (first after-octet) ".")) 
+      (setq ip (concatenate 'string (write-to-string value) "."))
+    (return-from valid-ipv4-p NIL))
 
-;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi.
+  (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
+      (setq ip (concatenate 'string ip (write-to-string value) "."))
+    (return-from valid-ipv4-p NIL))
+
+  (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
+      (setq ip (concatenate 'string ip (write-to-string value) "."))
+    (return-from valid-ipv4-p NIL))
+  (if (and (octet-p (rest after-octet)))
+      (setq ip (concatenate 'string ip (write-to-string value)))
+    (return-from valid-ipv4-p NIL))
+
+  ip
+)
+
+; Verifica se è un ottetto rappresentato da 1 o 2 o 3 numeri è valido.
+
+(defun octet-p (chars)
+  (cond
+   ((null chars) (return-from octet-p NIL))
+   ((and (numberp (digit-char-p (first chars)))
+         (and 
+          (not (null (second chars))) 
+          (numberp (digit-char-p (second chars))))
+         (and (not (null (third chars)))
+	      (numberp (digit-char-p (third chars)))))
+    (progn 
+      (setq value (+ (* 100 (digit-char-p (first chars)))
+                     (* 10 (digit-char-p (second chars)))
+                     (digit-char-p (third chars))))
+      (setq after-octet (rest (rest (rest chars))))
+      ))
+   ((and (numberp (digit-char-p (first chars))) 
+         (and 
+          (not (null (second chars))) 
+          (numberp (digit-char-p (second chars)))))
+    (progn 
+      (setq value (+ (* 10 (digit-char-p (first chars)))
+		     (digit-char-p (second chars))))
+      (setq after-octet (rest (rest chars)))
+      ))
+   ((and (numberp (digit-char-p (first chars))))
+    (progn 
+      (setq value (digit-char-p (first chars)))
+      (setq after-octet (rest chars))
+      ))
+   (T (return-from octet-p NIL)))
+  
+  (if (and (>= value 0) (<= value 255)) ; Verifica che l'ottetto sia tra 0 e 255
+      T         ; Restituisce il valore valido e il resto della lista
+    (error "Invalid IP octet: Value out of range.")))
+
+;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi
 (defun extract-host (chars)
   (cond
-   ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
-   ;;(valid-ipv4-p chars)
    ;; Caso: la stringa inizia con una lettera
    ((and (not (null chars)) (alpha-char-p (first chars)))
-    (extract-host-ricorsiva (rest chars)))
-
-   (error "invalid host")))
+    (append (list (first chars))
+            (extract-host-ricorsiva (rest chars))))
+   ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
+   ((valid-ipv4-p chars)
+    ip)
+   (T (error "invalid host"))))
 
 
 ;;; Estrazione ricorsiva dei caratteri che compongono l'Host.
@@ -211,7 +274,9 @@
 ;;; con controllo sull'esistenza di "/" come primo carattere.
 (defun extract-path (chars)
   (cond ((string= (first chars) "/")
-	 (extract-path-chars (rest chars)))))
+         (extract-path-chars (rest chars)))
+        ((alpha-char-p (first chars))
+         (extract-path-chars chars))))
 
 (defun extract-path-chars (chars)
   (cond ((null chars) NIL)
@@ -235,9 +300,9 @@
   (cond ((null chars) NIL)
 	((string= (first chars) "#")
 	 (progn
-	   (defparameter after chars)
+	   (setq after chars)
 	   NIL))
-	(T (if (caratterip (first chars))
+	(T (if (or (identificatorep (first chars)) (string= (first chars) "="))
 	       (append (list (first chars))
 		       (extract-query-chars (rest chars)))
 	       (error "invalid query character")))))
@@ -252,7 +317,7 @@
 	 (progn
 	   (defparameter after NIL)
 	   NIL))
-	(T (if (caratterip (first chars))
+	(T (if (identificatorep (first chars))
 	       (append (list (first chars))
 		       (extract-fragment-chars (rest chars)))
 	       (error "invalid fragment character")))))
@@ -281,9 +346,13 @@
 	((or (string= schema "tel") (string= schema "fax")) ; parsing tel e fax
 	 (make-uri-struct
 	  :schema schema
-	  :userinfo (if (contains-separator chars "@")
-			(error "invalid userinfo")
-			(coerce (extract-userinfo chars) 'string))
+	  :userinfo (cond ((contains-separator chars "@")
+                           (error "invalid userinfo"))
+                          ((string= (first chars) "+") 
+                           (coerce (append '(#\+)
+					   (extract-userinfo (rest chars)))
+				   'string))
+                          (T (coerce (extract-userinfo chars) 'string)))
 	  :port 80))
 	((string= schema "zos") ; parsing zos
 	 (progn
@@ -291,21 +360,28 @@
 	   (make-uri-struct
 	    :schema (coerce schema 'string)
 	    :userinfo (if (equal
-			   (authority-struct-userinfo authority)
-			   NIL)
-			  NIL
-			  (coerce
-			   (authority-struct-userinfo authority)
-			   'string))
-	    :host (coerce
-		   (authority-struct-host authority)
-		   'string)
-	    :port (parse-integer (coerce
-				  (authority-struct-port authority)
-				  'string))
-	    :path (if (contains-separator after "/")
-		      (coerce (extract-zos-path after) 'string)
-		      (error "missing path"))
+                           (authority-struct-userinfo authority)
+                           NIL)
+                          NIL
+                        (coerce
+                         (authority-struct-userinfo authority)
+                         'string))
+            :host (coerce
+                   (authority-struct-host authority)
+                   'string)
+            :port (parse-integer 
+                   (coerce
+                    (authority-struct-port authority)
+                    'string))
+	    :path (cond ((null after) NIL)
+                        ((string= (first after) "/")
+                         (progn 
+                           (setq after (rest after))
+                           (coerce (extract-zos-path after) 'string)))
+                        ((alpha-char-p (first after))
+                         (coerce (extract-zos-path after) 'string))
+                        ((or (string= (first chars) "#")
+			     (string= (first chars) "?")) NIL))
 	    :query (if (contains-separator after "?")
 		       (coerce (extract-query after) 'string)
 		       NIL)
@@ -317,7 +393,8 @@
 
 ;;; Parsing del Path di un URI che corrisponde allo Schema "zos".
 (defun extract-zos-path (chars)
-  (cond ((or (and (contains-separator chars "(")
+  (cond ((null chars) NIL)
+        ((or (and (contains-separator chars "(")
 		  (not (contains-separator chars ")")))
 	     (and (not (contains-separator chars "("))
 		  (contains-separator chars ")")))
@@ -325,14 +402,17 @@
         ((and (contains-separator chars "(")
 	      (contains-separator chars ")"))
 	 (progn
-	   (setq id44-chars (id44 (rest chars)))
+           (setq id44-chars (id44 chars))
 	   (setq id8-chars (id8 after))
 	   (cond ((or (< (length id44-chars) 1)
-		      (< (length id8-chars) 1))
+                      (> (length id44-chars) 44)
+		      (< (length id8-chars) 1)
+                      (> (length id8-chars) 8))
 		  (error "invalid sequence")))
 	   (append id44-chars '(#\() id8-chars '(#\)))))
+        ((or (string= (first chars) "#") (string= (first chars) "?")) NIL)
 	(T (progn
-	     (setq id44-chars (id44 (rest chars)))
+	     (setq id44-chars (id44 chars))
 	     (cond ((< (length id44-chars) 1)
 		    (error "invalid sequence")))
 	     id44-chars))))
@@ -346,7 +426,7 @@
 	 NIL)
 	((or (alphanumericp (first chars)) (string= (first chars) "."))
 	 (progn
-	   (defparameter after (rest chars))
+	   (setq after (rest chars))
 	   (append (list (first chars)) (id44 (rest chars)))))
 	(T (error "invalid id44 character"))))
 
@@ -356,66 +436,20 @@
 	 (id8 (rest chars)))
 	((string= (first chars) ")")
 	 (progn
-	   (defparameter after (rest chars))
+	   (setq after (rest chars))
 	   NIL))
 	((null chars) (error "invalid id8"))
 	((alphanumericp (first chars))
 	 (progn
-	   (defparameter after (rest chars))
+	   (setq after (rest chars))
 	   (append (list (first chars)) (id8 (rest chars)))))
 	(T (error "invalid id8 character"))))
 
 ;;; Viene stabilito se il carattere passato in input corrisponde
 ;;; ad uno dei caratteri accettati dalla specifica corrente.
-(defun caratterip (char)
-  (or (alphanumericp char)
-      (string= char " ")
-      (string= char "-")
-      (string= char ".")
-      (string= char "_")
-      (string= char "~")
-      (string= char ":")
-      (string= char "/")
-      (string= char "?")
-      (string= char "#")
-      (string= char "[")
-      (string= char "]")
-      (string= char "@")
-      (string= char "!")
-      (string= char "$")
-      (string= char "&")
-      (string= char "'")
-      (string= char "(")
-      (string= char ")")
-      (string= char "*")
-      (string= char "+")
-      (string= char ",")
-      (string= char ";")
-      (string= char "=")))
-
-;;; Tramite questo subset di caratteri, usato in alcuni componenti
-;;; dell'URI, viene stabilito se il carattere passato in input
-;;; corrisponde ad uno dei caratteri accettati dalla specifica corrente.
 (defun identificatorep (char)
   (or (alphanumericp char)
-      (string= char " ")
-      (string= char "-")
       (string= char ".")
-      (string= char "_")
-      (string= char "~")
-      (string= char "[")
-      (string= char "]")
-      (string= char "!")
-      (string= char "$")
-      (string= char "&")
-      (string= char "'")
-      (string= char "(")
-      (string= char ")")
-      (string= char "*")
-      (string= char "+")
-      (string= char ",")
-      (string= char ";")
-      (string= char "=")))
-
+      (string= char "_")))
 
 ;;;; urilib-parse.lisp ends here.

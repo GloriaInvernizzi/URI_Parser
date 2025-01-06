@@ -1,9 +1,9 @@
-;;;; Pomi Beatrice 914386
-;;;; Invernizzi Gloria 910243
-
 ;;;; -*- Mode: Lisp -*-
 
 ;;;; urilib-parse.lisp
+
+;;;; Pomi Beatrice 914386
+;;;; Invernizzi Gloria 910243
 
 ;;;; RFC3986 (https://datatracker.ietf.org/doc/html/rfc3986)
 
@@ -56,7 +56,8 @@
 	     :path NIL
 	     :query NIL
 	     :fragment NIL)
-	    (if (special-schema-p (coerce schema 'string)) ; caso "sintassi speciale"
+	    ; caso "sintassi speciale"
+	    (if (special-schema-p (coerce schema 'string))
 		(extract-special-uri (coerce schema 'string) after)
 		(progn
 	          (setq authority (extract-authority after))
@@ -207,7 +208,8 @@
          (and 
           (not (null (second chars))) 
           (numberp (digit-char-p (second chars))))
-         (and (not (null (third chars))) (numberp (digit-char-p (third chars)))))
+         (and (not (null (third chars)))
+	      (numberp (digit-char-p (third chars)))))
     (progn 
       (setq value (+ (* 100 (digit-char-p (first chars)))
                      (* 10 (digit-char-p (second chars)))
@@ -219,7 +221,8 @@
           (not (null (second chars))) 
           (numberp (digit-char-p (second chars)))))
     (progn 
-      (setq value (+ (* 10 (digit-char-p (first chars))) (digit-char-p (second chars))))
+      (setq value (+ (* 10 (digit-char-p (first chars)))
+		     (digit-char-p (second chars))))
       (setq after-octet (rest (rest chars)))
       ))
    ((and (numberp (digit-char-p (first chars))))
@@ -229,11 +232,11 @@
       ))
    (T (return-from octet-p NIL)))
   
-  (if (and (>= value 0) (<= value 255))  ; Verifica che l'ottetto sia tra 0 e 255
+  (if (and (>= value 0) (<= value 255)) ; Verifica che l'ottetto sia tra 0 e 255
       T         ; Restituisce il valore valido e il resto della lista
     (error "Invalid IP octet: Value out of range.")))
 
-;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi.
+;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi
 (defun extract-host (chars)
   (cond
    ;; Caso: la stringa inizia con una lettera
@@ -346,7 +349,9 @@
 	  :userinfo (cond ((contains-separator chars "@")
                            (error "invalid userinfo"))
                           ((string= (first chars) "+") 
-                           (coerce (append '(#\+) (extract-userinfo (rest chars))) 'string))
+                           (coerce (append '(#\+)
+					   (extract-userinfo (rest chars)))
+				   'string))
                           (T (coerce (extract-userinfo chars) 'string)))
 	  :port 80))
 	((string= schema "zos") ; parsing zos
@@ -375,7 +380,8 @@
                            (coerce (extract-zos-path after) 'string)))
                         ((alpha-char-p (first after))
                          (coerce (extract-zos-path after) 'string))
-                        ((or (string= (first chars) "#") (string= (first chars) "?")) NIL))
+                        ((or (string= (first chars) "#")
+			     (string= (first chars) "?")) NIL))
 	    :query (if (contains-separator after "?")
 		       (coerce (extract-query after) 'string)
 		       NIL)

@@ -1,20 +1,23 @@
+%%%% -*- Mode: Prolog -*-
+%%%% urilib-parse.pl
+
 %%%% Pomi Beatrice 914386
 %%%% Invernizzi Gloria 910243
-
-%%% -*- Mode: Prolog -*-
-
-%%%% urilib-parse.pl
 
 %%%% RFC3986 (https://datatracker.ietf.org/doc/html/rfc3986)
 
 %   urilib_parse(URIString, URI)
 urilib_parse(URIString, URI) :-
-    % Trasforma la stringa URISTRING in una lista, ad ogni carattere associa il codice ascii e mette il risultato in Codes
+    % Trasforma la stringa URISTRING in una lista, ad ogni carattere associa
+    % il codice ascii e mette il risultato in Codes
     string(URIString),
-    atom_codes(URIString, Codes),   % atoms_code è una funzione valida per coerce in prolog (casting)
+    % atoms_code è una funzione valida per coerce in prolog (casting)
+    atom_codes(URIString, Codes),
     schema(Codes, SchemaCodes, AfterSchema),
-    atom_codes(Schema, SchemaCodes), % trasforma lista in string, inverso, incognita in questo caso è Scheme
-    parse_uri_with_schema(Schema, AfterSchema, URI). % parser URI based to uri scheme structure
+    % trasforma lista in string, inverso, incognita in questo caso è Scheme
+    atom_codes(Schema, SchemaCodes),
+    % parser URI based to uri scheme structure
+    parse_uri_with_schema(Schema, AfterSchema, URI).
 
 %   schema(Codes, Schema, After)
 %   Definition of the scheme (http, https, ftp, mailto, file, zos ...)
@@ -23,7 +26,8 @@ urilib_parse(URIString, URI) :-
 schema([C | Codes], Schema, After) :-
     C = 58, % Codice ASCII per :
     !,
-    Schema = [],  % Scheme è tutto quello che c'è prima del :, after è tutto quello che c'è dopo
+    % Scheme è tutto quello che c'è prima di : after è tutto quello che c'è dopo
+    Schema = [],
     After = Codes.
 
 % induttivo
@@ -478,7 +482,8 @@ is_letter(C) :- C >= 97, C =< 122. % Minuscole (a-z)
 %   L'Host viene estratto dai codici passati in input, se il formato dell'Host
 %   corrisponde a quello di un indirizzo IP.
 %   46 è il codice ASCII per .
-% 192.168.156.12 ==> ipv4, 32 bit === 4 byte, 4 ottetti di bit, ogni ottetto separato da un punto
+% 192.168.156.12 ==> ipv4, 32 bit === 4 byte, 4 ottetti di bit
+% ogni ottetto separato da un punto
 
 ip(Codes, Host, After):-
     octet(Codes, FirstOctet, [46 | AfterFirstOctet]),
@@ -622,7 +627,7 @@ zos_path([C | Codes]) :-
     length(Id44Codes, Id44Length),
     Id44Length =< 44,
     last(Id44Codes, LastId44Character),
-    LastId44Character \= 46,        % . in ASCII non puÃ² essere x lo schema zos
+    LastId44Character \= 46,        % . in ASCII non può essere x lo schema zos
     id8(AfterId44Codes, Id8Codes),
     length(Id8Codes, Id8Length),
     Id8Length =< 8.
@@ -748,7 +753,7 @@ urilib_display(URI, Stream) :-
 identificatore(C) :-
     is_alnum(C);
     C = 46;  % .
-    %C = 95;  % _
+    C = 95;  % _
     C = 47;  % /
     C = 63;  % ?
     C = 40;  % (
