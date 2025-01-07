@@ -6,24 +6,24 @@
 
 (defun test-urilib-parse ()
   "Esegue il comando urilib-parse su una lista di URI e stampa i risultati."
-  (setq uris '( 
+  (setq uris '(
                ; Validi
 
                "http://example.com"
                "http://123.123.12.123"
-               "http:path/to/file.pdf"
-               "http:"
+               "https:path/to/file.pdf"
+               "https:"
                "http:/"
                "http:?query"
-               "http:#fragment"
+               "ftp:#fragment"
                "http:/path/to/file.pdf"
                "http:?query#fragment"
                "http://user:1/path"
-               "http://user/path" 
-               "http://user"     
-               "http://ip:3"      
-               "http://user:580"  
-               "htp:/example.com" 
+               "ftp://user/path"
+               "ftp://user"
+               "http://ip:3"
+               "http://user:580"
+               "htp:/example.com"
                "zos://blabla.com:100"
                "zos://blabla.com:100/#fragment"
                "zos://blabla.com:100/?query"
@@ -45,7 +45,7 @@
                "tel:+39-3541237567"
                "tel:+1-816-555-1212"
 
-               
+
                ; Non validi
                "mailto"
                "http://"
@@ -59,13 +59,14 @@
                "http://example.com:-80"
                "https://example.com/<>"
                "http://[::1]:8080"
-               "http://user:pass@host.com:8080/path" 
+               "http://user:pass@host.com:8080/path"
                "file:///C:/path/to/file"
                "http://user:p/path"
                "zos://example.com/q.s.d.2.1.2.3.(12345678910)"
                "zos:abcid44(12345678910)"
-               "news:122.344.3.2"
-               "ciao:"))
+               "file:path/to/file.pdf"
+               "test:user@example.it"
+               "news:122.344.3.2"))
     (dolist (uri uris)
       (format t "~%Input: ~a~%" uri)
       (handler-case

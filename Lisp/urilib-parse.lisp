@@ -47,12 +47,15 @@
   (if (stringp uri)
       (progn
 	(setq schema (extract-schema (coerce uri 'list)))
+        (if (not (valid-schema-p (coerce schema 'string)))
+            (error "Unrecognized schema")
+          NIL)
 	(if (null after) ; caso "solo Schema"
 	    (make-uri-struct
 	     :schema (coerce schema 'string)
 	     :userinfo NIL
 	     :host NIL
-	     :port 80
+	     :port (get-port-from-schema schema)
 	     :path NIL
 	     :query NIL
 	     :fragment NIL)
@@ -130,7 +133,7 @@
 			(if (null port)
 			    (error "invalid port")
 			    port))
-		      "80"))))
+                    (get-port-from-schema schema)))))
         ;; Nel secondo caso l'Authority non è presente
         ((or (and (string= (first chars) "/")
 	      (not (string= (second chars) "/")))
@@ -142,7 +145,7 @@
 	   (make-authority-struct
 	    :userinfo NIL
 	    :host NIL
-	    :port "80")))
+	    :port (get-port-from-schema schema))))
 	(T (error "authority not recognized"))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono l'Authority.
@@ -450,6 +453,20 @@
 (defun identificatorep (char)
   (or (alphanumericp char)
       (string= char ".")
-      (string= char "_")))
+      (string= char "_")
+      (string= char "-")))
 
+;;; Viene stabilito se lo schema non speciale è accettato
+(defun valid-schema-p (schema)
+  (or (string= schema "http")
+      (string= schema "https")
+      (string= schema "ftp")
+      (special-schema-p schema)))
+
+(defun get-port-from-schema (schema)
+  (cond ((string= (coerce schema 'string) "https")
+          "443")
+         ((string= (coerce schema 'string) "ftp")
+          "21")
+         (T "80")))
 ;;;; urilib-parse.lisp ends here.
