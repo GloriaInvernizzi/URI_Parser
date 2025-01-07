@@ -37,10 +37,9 @@ schema([C | Codes], Schema, After) :-
     schema(Codes, S, After),
     Schema = [C | S].
 
-schema(Schema) :-
-    Schema = 'http';
-    Schema = 'https';
-    Schema = 'ftp'.
+schema(Schema) :- Schema = 'http'.
+schema(Schema) :- Schema = 'https'.
+schema(Schema) :- Schema = 'ftp'.
 
 %   parse_uri_with_schema(Schema, AfterSchema, URI)
 %
@@ -51,6 +50,7 @@ schema(Schema) :-
 
 %   Uno Schema seguito dal nulla è un URI valido.
 parse_uri_with_schema(Schema, [], URI) :-
+    schema(Schema),
     !,
     URI = uri(Schema, [], [], 80, [], [], []).
 
@@ -61,7 +61,7 @@ parse_uri_with_schema(Schema, AfterSchema, URI) :-
     plain_userinfo(AfterSchema, U, []),
     !,
     atom_codes(Userinfo, U),
-    URI = uri('mailto', Userinfo, [], [], [], [], []).
+    URI = uri('mailto', Userinfo, [], 80, [], [], []).
 
 %   Parse di un URI contenente Userinfo e Host secondo il formato dello Schema
 %   mailto.
@@ -776,27 +776,24 @@ is_letter(C) :- C >= 97, C =< 122. % Minuscole (a-z)
 %   Viene stabilito se il carattere passato in input corrisponde ad uno dei
 %   caratteri accettati dalla specifica corrente.
 
-identificatore(C) :-
-    is_alnum(C);
-    C = 46;  % .
-    C = 95;  % _
-    C = 47;  % /
-    C = 63;  % ?
-    C = 40;  % (
-    C = 41;  % )
-    C = 35;  % #
-    C = 43;  % +
-    C = 45;  % -
-    C = 61.  % =
+identificatore(C) :- carattere(C).
+identificatore(C) :- C = 46.  % .
+identificatore(C) :- C = 47.  % /
+identificatore(C) :- C = 63.  % ?
+identificatore(C) :- C = 40.  % (
+identificatore(C) :- C = 41.  % )
+identificatore(C) :- C = 35.  % #
+identificatore(C) :- C = 43.  % +
+identificatore(C) :- C = 45.  % -
+identificatore(C) :- C = 61.  % =
 
 %   carattere(Carattere)
 %
 %   Viene stabilito se il carattere passato in input corrisponde ad uno dei
 %   caratteri accettati dalla specifica corrente.
 
-carattere(C) :-
-    is_alnum(C);
-    C = 95.      % _
+carattere(C) :- is_alnum(C).
+carattere(C) :- C = 95. % _
 
 %%%% urilib-parse.pl ends here
 

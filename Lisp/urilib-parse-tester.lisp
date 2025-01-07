@@ -41,6 +41,10 @@
                "https://example.com:8080/path?query=1#fragment"
                "ftp://ftp.example.com"
                "mailto:user@example.com"
+               "fax:+1-816-555-1212"
+               "tel:+39-3541237567"
+               "tel:+1-816-555-1212"
+
                
                ; Non validi
                "mailto"
@@ -60,7 +64,8 @@
                "http://user:p/path"
                "zos://example.com/q.s.d.2.1.2.3.(12345678910)"
                "zos:abcid44(12345678910)"
-               "news:122.344.3.2"))
+               "news:122.344.3.2"
+               "ciao:"))
     (dolist (uri uris)
       (format t "~%Input: ~a~%" uri)
       (handler-case
