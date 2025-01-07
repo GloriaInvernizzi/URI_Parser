@@ -346,7 +346,6 @@ authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
     !,
     atom_codes(Userinfo, U),
     atom_codes(Host, H),
-    %Port = 80
     port(Schema, Port).
 
 authority(Schema, [C1, C2 | Chars], Userinfo, Host, Port, After) :-
