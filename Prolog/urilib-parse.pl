@@ -656,6 +656,7 @@ zos_path([C | Codes]) :-
 %   secondo il formato dello Schema zos.
 
 % mette in id44 tutti i caratteri + . che ci sono tra lo schema e il carattere (
+
 id44([], Id44, After) :-
     Id44 = [],
     After = [].
@@ -693,9 +694,10 @@ parse_id8([C | Codes], Id8) :-
     !,
     parse_id8(Codes, I),
     Id8 = [C | I]. % Id8 contiene tutti i caratteri compresi tra le ()
+
 id8([C1, C2 | Codes], Id8) :-
     C1 = 40, % Codice ASCII per (
-    is_alnum(C2),
+    is_letter(C2),
     !,
     parse_id8([C2 | Codes], Id8).
 
