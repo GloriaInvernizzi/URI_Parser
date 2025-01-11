@@ -1,8 +1,8 @@
 ;;; -*- Mode: Lisp -*-
 
 ;; urilib_tester.lisp
-(load "C:/Users/gloria/OneDrive/Desktop/UNI/URI_Parser/Lisp/urilib-parse-let.lisp")
-;(load "C:/Users/pomib/OneDrive/Documenti/uni/lp/Pomi_Beatrice_914386_LP_E1P_2025/URI_Parser/Lisp/urilib-parse.lisp")
+;(load "C:/Users/gloria/OneDrive/Desktop/UNI/URI_Parser/Lisp/urilib-parse-let.lisp")
+(load "C:/Users/pomib/OneDrive/Documenti/uni/lp/Pomi_Beatrice_914386_LP_E1P_2025/URI_Parser/Lisp/urilib-parse-let.lisp")
 
 (defun test-urilib-parse ()
   "Esegue il comando urilib-parse su una lista di URI e stampa i risultati."
