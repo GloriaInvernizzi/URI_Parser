@@ -26,7 +26,7 @@
 
 ;;; Metodo di debug per stampare l'URI passato in input sullo stream
 ;;; di destinazione. Nel caso in cui stream non fosse passato alla
-;;; funzione, l'output verrà stampato sullo stream corrente.
+;;; funzione, l'output verrï¿½ stampato sullo stream corrente.
 
 (defun urilib-display (uri &optional (stream T))
   (format stream "Schema:~13T~S~%" (urilib-scheme uri))
@@ -44,11 +44,14 @@
 ;;; a partire dal parsing dello Schema, che restituisce infine
 ;;; una URISTRUCT popolata con i suoi componenti.
 (defun urilib-parse (uri)
-  (if (stringp uri)
-      (let* ((schema (extract-schema (coerce uri 'list))))
+  (when (stringp uri)
+    ;; Converto la stringa in lista di caratteri
+    (let* ((uri-chars (coerce uri 'list)))
+      ;; Otteniamo lo schema e "after"
+      (multiple-value-bind (schema after) (extract-schema uri-chars)
         (if (not (valid-schema-p (coerce schema 'string)))
             (error "Unrecognized schema"))
-        ; Caso "solo Schema"
+        ;; Caso "solo Schema"
         (if (null after)
             (make-uri-struct
              :schema (coerce schema 'string)
@@ -58,43 +61,54 @@
              :path NIL
              :query NIL
              :fragment NIL)
-          ; Caso "sintassi speciale"
-          (if (special-schema-p (coerce schema 'string)) 
+          ;; Caso "sintassi speciale"
+          (if (special-schema-p (coerce schema 'string))
               (extract-special-uri (coerce schema 'string) after)
-            (let* ((authority (extract-authority after schema))
-                   (userinfo (if (equal (authority-struct-userinfo authority) NIL)
-                                 NIL
-                                 (coerce (authority-struct-userinfo authority) 'string)))
-                   (host (coerce (authority-struct-host authority) 'string))
-                   (port (parse-integer (coerce (authority-struct-port authority) 'string)))
-                   (path (if (null after) NIL (coerce (extract-path after) 'string)))
-                   (query (if (contains-separator after "?")
-                              (coerce (extract-query after) 'string)
-                              NIL))
-                   (fragment (if (contains-separator after "#")
-                                 (coerce (extract-fragment after) 'string)
-                                 NIL)))
-              (make-uri-struct
-               :schema (coerce schema 'string)
-               :userinfo userinfo
-               :host host
-               :port port
-               :path path
-               :query query
-               :fragment fragment)))))
-      NIL))
+            ;; Authority e rimanente URI
+            (multiple-value-bind (authority after-authority)
+                (extract-authority after schema)
+              (let* ((userinfo
+                      (if (equal (authority-struct-userinfo authority) NIL)
+                          NIL
+                        (coerce
+                         (authority-struct-userinfo authority) 'string)))
+                     (host (coerce
+                            (authority-struct-host authority) 'string))
+                     (port (parse-integer
+                            (coerce
+                             (authority-struct-port authority) 'string))))
+                ;; Estrazione del Path
+                (multiple-value-bind (path after-path)
+                    (extract-path after-authority)
+                  ;; Estrazione della Query
+                  (multiple-value-bind (query after-query)
+                      (extract-query after-path)
+                    ;; Estrazione del Fragment
+                    (multiple-value-bind (fragment after-fragment)
+                        (extract-fragment after-query)
+                      (make-uri-struct
+                       :schema (coerce schema 'string)
+                       :userinfo userinfo
+                       :host host
+                       :port port
+                       :path (when path (coerce path 'string))
+                       :query (when query (coerce query 'string))
+                       :fragment (when fragment
+                                   (coerce fragment 'string))))))))))))))
 
 ;;; Estrazione dello Schema
 (defun extract-schema (chars)
-  (cond ((null chars) (error "Schema is not valid"))
-	((string= (first chars) ":")
-	 (defparameter after (rest chars))
-	 NIL)
-	(T (if (identificatorep (first chars))
-	       (append
-		(list (first chars))
-		(extract-schema (rest chars)))
-	       (error "invalid schema character")))))
+  (cond
+   ((null chars) (error "Schema is not valid"))
+   ; Controlla se il primo carattere Ã¨ ":"
+   ((char= (first chars) #\:)
+   ; Restituisce NIL come schema e il resto dei caratteri
+    (values nil (rest chars)))
+   (t (if (identificatorep (first chars))
+          (multiple-value-bind (schema rest)
+              (extract-schema (rest chars))
+            (values (cons (first chars) schema) rest))
+        (error "Invalid schema character")))))
 
 ;;; Predicato per definire la presenza di uno Schema caratterizzato
 ;;; da "sintassi speciale"
@@ -105,61 +119,76 @@
       (string= schema "fax")
       (string= schema "zos")))
 
-;;; Estrazione dei componenti dell'Authority che vengono restituiti
-;;; all'interno di un AUTHORITY-STRUCT.
 (defun extract-authority (chars schema)
-  ;; Nel primo caso l'Authority è presente
   (cond
+   ;; Caso in cui l'Authority Ã¨ presente
    ((and (string= (first chars) "/")
          (string= (second chars) "/"))
-    (let* ((authority (extract-authority-chars (rest (rest chars))))
-           (userinfo (if (contains-separator authority "@")
-                         (extract-userinfo authority)
+    (if (or (null (third chars))(string= (third chars) "?") (string= (third chars) "#"))
+        (error "Undefined authority"))
+    (multiple-value-bind (authority after)
+    ; Estrazione authority e caratteri rimanenti
+        (extract-authority-chars (rest (rest chars)))
+      (let* ((userinfo (if (contains-separator authority "@")
+                           (extract-userinfo authority)
                          NIL))
-           (host (extract-host authority))
-           (port (if (contains-separator authority ":")
-                     (let ((extracted-port (extract-port authority)))
-                       (if (null extracted-port)
-                           (error "invalid port")
+             (host (extract-host authority))
+             (port (if (contains-separator authority ":")
+                       (let ((extracted-port (extract-port authority)))
+                         (if (null extracted-port)
+                             (error "invalid port")
                            extracted-port))
                      (get-port-from-schema schema))))
-      (make-authority-struct
-       :userinfo userinfo
-       :host host
-       :port port)))
-   
-   ;; Nel secondo caso l'Authority non è presente
+        (values (make-authority-struct
+                 :userinfo userinfo
+                 :host host
+                 :port port) after))))
+   ;; Caso schema speciale "news"
+   ((string= (coerce schema 'string) "news")
+    (multiple-value-bind (authority after)
+        (extract-authority-chars chars)
+      (values (make-authority-struct
+               :userinfo NIL
+               :host (extract-host authority)
+               :port 80) after)))
+   ;; Caso in cui l'Authority non è presente
    ((or (and (string= (first chars) "/")
              (not (string= (second chars) "/")))
         (string= (first chars) "?")
         (string= (first chars) "#")
         (alpha-char-p (first chars)))
-    (let ((after chars))
-      (make-authority-struct
-       :userinfo NIL
-       :host NIL
-       :port (get-port-from-schema schema))))
-   
+    (let ((after chars))  ; Se non c'Ã¨ authority, l'intero input Ã¨ after
+      (values (make-authority-struct
+               :userinfo NIL
+               :host NIL
+               :port (get-port-from-schema schema)) after)))
    ;; Caso di errore
-   (T (error "authority not recognized"))))
+   (T (error "Authority not recognized"))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono l'Authority.
+;; Ritorna anche il restante URI
 (defun extract-authority-chars (chars)
-  (cond ((or (string= (first chars) "/")
-	     (string= (first chars) "?")
-	     (string= (first chars) "#"))
-	 (progn
-	   (defparameter after chars)
-	   NIL))
-        ((and (string= (first chars) ".")
-              (string= (second chars) "."))
-         (error "invalid sintax"))
-	((null chars)
-	 (progn
-	   (defparameter after NIL)
-	   NIL))
-	(T (append (list (first chars))
-		   (extract-authority-chars (rest chars))))))
+  (cond
+   ;; ".." nell'authority non è accettato
+   ((and (string= (first chars) ".") 
+     (string= (second chars) ".")) 
+    (error "Invalid host syntax"))
+   ;; Se troviamo uno dei separatori che termina l'authority
+   ((or (string= (first chars) "/")
+        (string= (first chars) "?")
+        (string= (first chars) "#"))
+    (values NIL chars))
+   ;; La lista di caratteri ï¿½ vuota
+   ((null chars)
+    (values NIL NIL))
+   
+   ;; Aggiungiamo il primo carattere all'authority e esegui il passo ricorsivo
+   (T
+    (multiple-value-bind (authority after)
+        ;; Esamino i restanti caratteri
+        (extract-authority-chars (rest chars))
+      (values (cons (first chars) authority) after)))))
+
 
 ;;; Funzione di utility che determina la presenza o meno di un certo
 ;;; carattere separatore passato in input.
@@ -171,68 +200,73 @@
 ;;; Estrazione ricorsiva dei caratteri che compongono lo Userinfo.
 (defun extract-userinfo (chars)
   (cond ((null chars) NIL)
-	((string= (first chars) "@") NIL)
+	((string= (first chars) "@") NIL)       
 	(T (if (identificatorep (first chars))
 	       (append (list (first chars))
 		       (extract-userinfo (rest chars)))
-	       (error "invalid userinfo character")))))
+             (error "invalid userinfo character")))))
 
-;;; Riconosce IPv4 validi
+
+;;; Verifica se l'host ï¿½ un indirizzo IP valido
+;; Analizza Ip ottetto per ottetto, ottetti al piï¿½ di tre cifre separati da  '.'
 (defun valid-ipv4-p (chars)
-  (if (and (octet-p chars) (string= (first after-octet) ".")) 
-      (setq ip (concatenate 'string (write-to-string value) "."))
-    (return-from valid-ipv4-p NIL))
+  (let* ((first (parse-octet chars))
+         (after-octet1 (when (not (null first))
+                         (nthcdr (cdr first) chars))))
+    ;; Se ï¿½ valido il primo ottetto analizzo il successivo
+    ;; Ottetti separati da '.'
+    (when (and first (string= (first after-octet1) "."))
+      (let* ((second (parse-octet (rest after-octet1)))
+             (after-octet2 (when (not (null second))
+                             (nthcdr (cdr second) (rest after-octet1)))))
+        (when (and second (string= (first after-octet2) "."))
+          (let* ((third (parse-octet (rest after-octet2)))
+                 (after-octet3 (when (not (null third))
+                                 (nthcdr (cdr third) (rest after-octet2)))))
+            (when (and third
+                       (string= (first after-octet3) "."))
+              (let* ((fourth
+                      (parse-octet (rest after-octet3))))
+                (when (not (null fourth))
+                  (format nil "~a.~a.~a.~a"
+                          (car first)
+                          (car second)
+                          (car third)
+                          (car fourth)))))))))))
 
-  (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
-      (setq ip (concatenate 'string ip (write-to-string value) "."))
-    (return-from valid-ipv4-p NIL))
 
-  (if (and (octet-p (rest after-octet)) (string= (first after-octet) "."))
-      (setq ip (concatenate 'string ip (write-to-string value) "."))
-    (return-from valid-ipv4-p NIL))
-  (if (and (octet-p (rest after-octet)))
-      (setq ip (concatenate 'string ip (write-to-string value)))
-    (return-from valid-ipv4-p NIL))
-
-  ip)
-
-; Verifica se è un ottetto rappresentato da 1 o 2 o 3 numeri è valido.
-(defun octet-p (chars)
-  (cond
-   ((null chars) NIL)
-   ((and (numberp (digit-char-p (first chars)))
-         (and 
-          (not (null (second chars))) 
-          (numberp (digit-char-p (second chars))))
-         (and (not (null (third chars)))
-              (numberp (digit-char-p (third chars)))))
-    (let* ((value (+ (* 100 (digit-char-p (first chars)))
-                     (* 10 (digit-char-p (second chars)))
-                     (digit-char-p (third chars))))
-           (after-octet (rest (rest (rest chars)))))
-      (if (and (>= value 0) (<= value 255))
-          T
-        (error "Invalid IP octet: Value out of range."))))
-   
-   ((and (numberp (digit-char-p (first chars))) 
-         (and 
-          (not (null (second chars))) 
-          (numberp (digit-char-p (second chars)))))
-    (let* ((value (+ (* 10 (digit-char-p (first chars)))
-                     (digit-char-p (second chars))))
-           (after-octet (rest (rest chars))))
-      (if (and (>= value 0) (<= value 255))
-          T
-        (error "Invalid IP octet: Value out of range."))))
-   
-   ((and (numberp (digit-char-p (first chars))))
-    (let* ((value (digit-char-p (first chars)))
-           (after-octet (rest chars)))
-      (if (and (>= value 0) (<= value 255))
-          T
-        (error "Invalid IP octet: Value out of range."))))
-   
-   (T NIL)))
+(defun parse-octet (chars)
+; Prende il primo carattere
+  (let* ((digit1 (digit-char-p (first chars))))
+    (when digit1
+      ;; Se il primo carattere ï¿½ una cifra analizza gli altri caratteri
+      ;; Valido se la lista ha piï¿½ di due caratteri e il secondo ï¿½ un numero
+      ;; digit2 Ã¨ la conversione del secondo carattere in numero, se Ã¨ valido
+      (let* ((digit2 (and
+                      (rest chars)
+                      ;; la AND restituisce la conversione char -> integer
+                      (digit-char-p (second chars))))
+             (digit3 (and
+                      digit2
+                      (rest (rest chars))
+                      (digit-char-p (third chars)))))
+        (let ((value (cond
+                      ((and digit3) (+ (* 100 (or digit1 0))
+                                       (* 10 (or digit2 0))
+                                       (or digit3 0)))
+                      ((and digit2) (+ (* 10 (or digit1 0))
+                                       (or digit2 0)))
+                      ((and digit1) (or digit1 0))
+                      (T NIL))))
+          (cond
+           ; Ottetto con 3 cifre
+           ((and digit3 (<= value 255)) (cons value 3))
+           ; Ottetto con 2 cifre
+           ((and digit2 (<= value 255)) (cons value 2))
+           ; Ottetto con 1 cifra
+           ((and (not (null value)) (<= value 255)) (cons value 1))
+           ; Valore non valido
+           (t nil)))))))
 
 
 ;;; Riconosce stringhe che iniziano con una lettera oppure indirizzi IPv4 validi
@@ -244,7 +278,7 @@
             (extract-host-ricorsiva (rest chars))))
    ;; Caso: la stringa rappresenta un indirizzo IPv4 valido
    ((valid-ipv4-p chars)
-    ip)
+    (valid-ipv4-p chars))
    (T (error "invalid host"))))
 
 
@@ -257,7 +291,7 @@
 	(T (if (identificatorep (first chars))
 	       (append (list (first chars))
 		       (extract-host-ricorsiva (rest chars)))
-	       (error "invalid host character")))))
+             (error "invalid host character")))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono Port.
 (defun extract-port (chars)
@@ -267,86 +301,103 @@
 	(T (if (numberp (digit-char-p (first chars)))
 	       (append (list (first chars))
 		       (extract-port (rest chars)))
-	       (error "invalid port character")))))
+             (error "invalid port character")))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono il Path,
 ;;; con controllo sull'esistenza di "/" come primo carattere.
 (defun extract-path (chars)
-  (cond ((string= (first chars) "/")
+  (cond ((null chars) (values NIL NIL))
+        ((string= (first chars) "/")
          (extract-path-chars (rest chars)))
         ((alpha-char-p (first chars))
          (extract-path-chars chars))))
 
+;; Estrae ricorsivamente i caratteri del path, restituisce il path e il resto
 (defun extract-path-chars (chars)
-  (cond ((null chars) NIL)
-	((or (string= (first chars) "?")
-	     (string= (first chars) "#"))
-	 (progn
-	   (defparameter after chars)
-	   NIL))
-	(T (if (or (identificatorep (first chars))
-		   (string= (first chars) "/"))
-	       (append (list (first chars))
-		       (extract-path-chars (rest chars)))
-	       (error "invalid path character")))))
+  (cond
+   ((null chars)
+    (values NIL NIL))
+   ;; Se si incontra un separatore di path per query ? o fragment #
+   ((or (string= (first chars) "?")
+        (string= (first chars) "#"))
+    (values NIL chars))
+   ;; Caso generale verifica i caratteri e continua la ricorsione
+   (T
+    (if (or (identificatorep (first chars))
+            (string= (first chars) "/"))
+        (multiple-value-bind (path rest)
+            (extract-path-chars (rest chars))
+          ;; Restituisce il path e l'uri rimanente
+          (values (cons (first chars) path) rest))
+      (error "Invalid path character")))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono la Query.
 (defun extract-query (chars)
-  (cond ((string= (first chars) "?")
+  (cond ((null chars) (values NIL NIL))
+        ((string= (first chars) "?")
 	 (extract-query-chars (rest chars)))))
 
 (defun extract-query-chars (chars)
-  (cond ((null chars) NIL)
+  (cond ((null chars) (values NIL NIL))
+        ;; Se si incontra il separatore per fragment
 	((string= (first chars) "#")
-	 (progn
-	   (defparameter after chars)
-	   NIL))
-	(T (if (or (identificatorep (first chars)) (string= (first chars) "="))
-	       (append (list (first chars))
-		       (extract-query-chars (rest chars)))
-	       (error "invalid query character")))))
+	 (values NIL chars))
+        ;; Caso generale chiamata ricorsiva
+	(T (if (or (identificatorep (first chars)) 
+                   (string= (first chars) "="))
+               (multiple-value-bind (query rest)
+                   (extract-query-chars (rest chars))
+                 ;; Restituisce la query e l'uri rimanente
+                 (values (cons (first chars) query) rest))
+             (error "Invalid query character")))))
 
 ;;; Estrazione ricorsiva dei caratteri che compongono il Fragment.
 (defun extract-fragment (chars)
-  (cond ((string= (first chars) "#")
+  (cond ((null chars) (values NIL NIL))
+        ((string= (first chars) "#")
 	 (extract-fragment-chars (rest chars)))))
 
 (defun extract-fragment-chars (chars)
   (cond ((null chars)
-	 (progn
-	   (defparameter after NIL)
-	   NIL))
+	 (values NIL NIL))
+        ;; Caso generale ricorsivo
 	(T (if (identificatorep (first chars))
-	       (append (list (first chars))
-		       (extract-fragment-chars (rest chars)))
-	       (error "invalid fragment character")))))
+               (multiple-value-bind (fragment rest)
+                   (extract-fragment-chars (rest chars))
+                 ;; Restituisce il fragment e l'uri rimanente
+                 (values (cons (first chars) fragment) rest))
+             (error "Invalid fragment character")))))
 
 ;;; Parsing di URI nel caso di Schema caratterizzati da "sintassi speciali".
 (defun extract-special-uri (schema chars)
   (cond
    ;; Parsing mailto
    ((string= schema "mailto")
-    (if (contains-separator chars "@")
-        (make-uri-struct
-         :schema schema
-         :userinfo (coerce (extract-userinfo chars) 'string)
-         :host (coerce (extract-host chars) 'string)
-         :port "80")
+    (multiple-value-bind (authority)
+        (extract-authority chars schema)
       (make-uri-struct
        :schema schema
-       :userinfo (coerce (extract-userinfo chars) 'string)
-       :port "80")))
-   
+       :userinfo (when (authority-struct-userinfo authority)
+                   (coerce (authority-struct-userinfo authority) 'string))
+       :host (when (authority-struct-host authority)
+               (coerce (authority-struct-host authority) 'string))
+       :port (if (authority-struct-port authority)
+                 (parse-integer
+                  (coerce (authority-struct-port authority) 'string))
+               "80"))))
    ;; Parsing news
    ((string= schema "news")
-    (make-uri-struct
-     :schema schema
-     :host (if (or (contains-separator chars "@")
-                   (contains-separator chars ":"))
-               (error "invalid host")
-             (coerce (extract-host chars) 'string))
-     :port 80))
-   
+    (multiple-value-bind (authority)
+        (extract-authority chars schema)
+      (let ((host (authority-struct-host authority)))
+        (when (or (null host)
+                  (contains-separator (coerce host 'list) "@")
+                  (contains-separator (coerce host'list) ":"))
+          (error "invalid host"))
+        (make-uri-struct
+         :schema schema
+         :host (coerce host 'string)
+         :port 80))))
    ;; Parsing tel e fax
    ((or (string= schema "tel") (string= schema "fax"))
     (make-uri-struct
@@ -359,43 +410,52 @@
                               'string))
                      (T (coerce (extract-userinfo chars) 'string)))
      :port 80))
-   
    ;; Parsing zos
    ((string= schema "zos")
-    (let* ((authority (extract-authority after schema))
-           (userinfo (if (equal (authority-struct-userinfo authority) NIL)
-                         NIL
-                         (coerce (authority-struct-userinfo authority) 'string)))
-           (host (coerce (authority-struct-host authority) 'string))
-           (port (parse-integer (coerce (authority-struct-port authority) 'string)))
-           (path (cond
-                  ((null after) NIL)
-                  ((string= (first after) "/")
-                   (defparameter after (rest after))
-                     (coerce (extract-zos-path after) 'string))
-                  ((alpha-char-p (first after))
-                   (coerce (extract-zos-path after) 'string))
-                  ((or (string= (first chars) "#")
-                       (string= (first chars) "?")) NIL)))
-           (query (if (contains-separator after "?")
-                      (coerce (extract-query after) 'string)
-                      NIL))
-           (fragment (if (contains-separator after "#")
-                         (coerce (extract-fragment after) 'string)
-                         NIL)))
-      (make-uri-struct
-       :schema (coerce schema 'string)
-       :userinfo userinfo
-       :host host
-       :port port
-       :path path
-       :query query
-       :fragment fragment)))))
+    (multiple-value-bind (authority after-authority)
+        (extract-authority chars schema)
+      (let* ((userinfo
+              (when (authority-struct-userinfo authority)
+                (coerce (authority-struct-userinfo authority) 'string)))
+             (host (when (authority-struct-host authority)
+                     (coerce (authority-struct-host authority) 'string)))
+             (port (if (authority-struct-port authority)
+                       (parse-integer
+                        (coerce (authority-struct-port authority) 'string))
+                     NIL)))
+        ;; Estrazione del Path
+        (multiple-value-bind (path after-path)
+            (extract-zos-path after-authority)
+          ;; Estrazione della Query
+          (multiple-value-bind (query after-query)
+              (extract-query after-path)
+            ;; Estrazione del Fragment
+            (multiple-value-bind (fragment after-fragment)
+                (extract-fragment after-query) 
+              (make-uri-struct
+               :schema (coerce schema 'string)
+               :userinfo userinfo
+               :host host
+               :port port
+               :path (when path (coerce path 'string))
+               :query (when query (coerce query 'string))
+               :fragment (when fragment
+                           (coerce fragment 'string)))))))))))                     
 
-;;; Parsing del Path di un URI che corrisponde allo Schema "zos".
+;;; Estrazione ricorsiva dei caratteri che compongono il Path,
+;;; con controllo sull'esistenza di "/" come primo carattere.
 (defun extract-zos-path (chars)
+  (cond ((null chars) (values NIL NIL))
+        ((string= (first chars) "/")
+         (extract-zos-path-chars (rest chars)))
+        ((alpha-char-p (first chars))
+         (extract-zos-path-chars chars))))
+        
+;;; Parsing del Path di un URI che corrisponde allo Schema "zos".
+(defun extract-zos-path-chars (chars)
   (cond
-   ((null chars) NIL)
+   ((null chars)
+    (values NIL NIL))
    ((or (and (contains-separator chars "(")
              (not (contains-separator chars ")")))
         (and (not (contains-separator chars "("))
@@ -403,48 +463,51 @@
     (error "invalid sequence"))
    ((and (contains-separator chars "(")
          (contains-separator chars ")"))
-    (let* ((id44-chars (id44 chars))
-           (id8-chars (id8 after)))
-      (cond ((or (< (length id44-chars) 1)
-                 (> (length id44-chars) 44)
-                 (< (length id8-chars) 1)
-                 (> (length id8-chars) 8))
-             (error "invalid sequence")))
-      (append id44-chars '(#\() id8-chars '(#\)))))
-   ((or (string= (first chars) "#") (string= (first chars) "?"))
-    NIL)
-   (T (let ((id44-chars (id44 chars)))
-        (cond ((< (length id44-chars) 1)
+    (multiple-value-bind (id44-chars rest-after-id44) (id44 chars)
+      (multiple-value-bind (id8-chars rest-after-id8) (id8 rest-after-id44)
+        (cond ((or (< (length id44-chars) 1)
+                   (> (length id44-chars) 44)
+                   (< (length id8-chars) 1)
+                   (> (length id8-chars) 8))
                (error "invalid sequence")))
-        id44-chars))))
+        (values (append id44-chars '(#\() id8-chars '(#\)))
+                rest-after-id8))))
+   ((or (string= (first chars) "#") (string= (first chars) "?"))
+    (values NIL chars))
+   (T (multiple-value-bind (id44-chars rest-after-id44) (id44 chars)
+        (when (< (length id44-chars) 1)
+          (error "invalid sequence"))
+        (values id44-chars rest-after-id44)))))
 
 ;;; Estrazione ricorsiva dei caratteri di Id44.
 (defun id44 (chars)
-  (cond ((null chars) NIL)
-	((or (string= (first chars) "(")
-	     (string= (first chars) "?")
-	     (string= (first chars) "#"))
-	 NIL)
-	((or (alphanumericp (first chars)) (string= (first chars) "."))
-	 (progn
-	   (defparameter after (rest chars))
-	   (append (list (first chars)) (id44 (rest chars)))))
-	(T (error "invalid id44 character"))))
+  (cond
+   ((null chars)
+    (values NIL chars))
+   ((or (string= (first chars) "(")
+        (string= (first chars) "?")
+        (string= (first chars) "#"))
+    (values NIL chars))
+   ((or (alphanumericp (first chars)) (string= (first chars) "."))
+    (multiple-value-bind (id44 after-id44) (id44 (rest chars))
+      (values (append (list (first chars)) id44) after-id44)))
+   (T (error "invalid id44 character"))))
+
 
 ;;; Estrazione ricorsiva dei caratteri di Id8.
 (defun id8 (chars)
-  (cond ((contains-separator chars "(")
-	 (id8 (rest chars)))
-	((string= (first chars) ")")
-	 (progn
-	   (defparameter after (rest chars))
-	   NIL))
-	((null chars) (error "invalid id8"))
-	((alphanumericp (first chars))
-	 (progn
-	   (defparameter after (rest chars))
-	   (append (list (first chars)) (id8 (rest chars)))))
-	(T (error "invalid id8 character"))))
+  (cond
+   ((contains-separator chars "(")
+    (id8 (rest chars)))
+   ((string= (first chars) ")")
+    (values NIL (rest chars)))
+   ((null chars)
+    (error "invalid id8"))
+   ((alphanumericp (first chars))
+    (multiple-value-bind (id8 after-id8) (id8 (rest chars))
+      (values (append (list (first chars)) id8) after-id8)))
+   (T (error "invalid id8 character"))))
+
 
 ;;; Viene stabilito se il carattere passato in input corrisponde
 ;;; ad uno dei caratteri accettati dalla specifica corrente.
@@ -454,7 +517,7 @@
       (string= char "_")
       (string= char "-")))
 
-;;; Viene stabilito se lo schema non speciale è accettato
+;;; Viene stabilito se lo schema non speciale ï¿½ accettato
 (defun valid-schema-p (schema)
   (or (string= schema "http")
       (string= schema "https")
@@ -463,9 +526,9 @@
 
 (defun get-port-from-schema (schema)
   (cond ((string= (coerce schema 'string) "https")
-          "443")
-         ((string= (coerce schema 'string) "ftp")
-          "21")
-         (T "80")))
+         "443")
+        ((string= (coerce schema 'string) "ftp")
+         "21")
+        (T "80")))
 
 ;;;; urilib-parse.lisp ends here.
