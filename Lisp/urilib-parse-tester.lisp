@@ -1,7 +1,7 @@
 ;;; -*- Mode: Lisp -*-
 
 ;; urilib_tester.lisp
-(load "C:/Users/gloria/OneDrive/Desktop/UNI/URI_Parser/Lisp/urilib-parse.lisp")
+(load "C:/Users/gloria/OneDrive/Desktop/UNI/URI_Parser/Lisp/urilib-parse-let.lisp")
 ;(load "C:/Users/pomib/OneDrive/Documenti/uni/lp/Pomi_Beatrice_914386_LP_E1P_2025/URI_Parser/Lisp/urilib-parse.lisp")
 
 (defun test-urilib-parse ()
@@ -32,7 +32,6 @@
                "zos://blabla.com:100/p#f"
                "zos://blabla.com:100/p?q"
                "zos://blabla.com:100/p?q#f"
-               "zos://example.com/abcd.12(123)"
                "mailto:gloria@example.it"
                "mailto:gloria"
                "news:host"
@@ -56,13 +55,14 @@
                "http://example..com"
                "http://?query#fragment"
                "http://[::1]:"
-               "http://example.com:-80"
+               "http://example.com:-80" ;; -80
                "https://example.com/<>"
                "http://[::1]:8080"
-               "http://user:pass@host.com:8080/path"
-               "file:///C:/path/to/file"
+               "http://user:pass@host.com:8080/path" ;; : nell'userinfo
+               "file:///C:/path/to/file"  ;; :
                "http://user:p/path"
-               "zos://example.com/q.s.d.2.1.2.3.(12345678910)"
+               "zos://example.com/q.s.d.2.1.2.3.(12345678910)" ;; troppi caratteri in id8 e non inizia con lettera
+               "zos://example.com/abcd.12(123)"    ;; id8 deve iniziare con una lettera
                "zos:abcid44(12345678910)"
                "file:path/to/file.pdf"
                "test:user@example.it"
